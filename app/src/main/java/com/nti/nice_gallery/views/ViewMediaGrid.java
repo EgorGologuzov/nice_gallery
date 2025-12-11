@@ -2,6 +2,7 @@ package com.nti.nice_gallery.views;
 
 import android.content.Context;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.util.Size;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -200,9 +201,12 @@ public class ViewMediaGrid extends ScrollView {
 
             float sumWidth = rowWidths.stream().reduce(0f, Float::sum);
             float maxHeight = rowHeights.stream().max(Float::compareTo).get();
+            float avgHeight = rowHeights.stream().reduce(0f, Float::sum) / rowHeights.size();
             boolean isItemLast = items.indexOf(item) == items.size() - 1;
 
-            if ((sumWidth < MIN_IMAGES_ROW_WIDTH_PX || sumWidth / maxHeight < MIN_ROW_WIDTH_TO_HEIGHT_RATIO) && !isItemLast) {
+//            Log.d("QUILT_ALGORITHM", String.format("%s: %dx%d, %.2f, %.2f, %.2f", item.path, itemWidth, itemHeight, sumWidth, maxHeight, sumWidth / maxHeight));
+
+            if ((sumWidth < MIN_IMAGES_ROW_WIDTH_PX || sumWidth / avgHeight < MIN_ROW_WIDTH_TO_HEIGHT_RATIO) && !isItemLast) {
                 continue;
             }
 

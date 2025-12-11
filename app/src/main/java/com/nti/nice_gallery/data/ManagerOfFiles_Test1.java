@@ -1,8 +1,10 @@
 package com.nti.nice_gallery.data;
 
+import android.content.ContentResolver;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.drawable.BitmapDrawable;
+import android.net.Uri;
 import android.util.Size;
 
 import androidx.core.content.ContextCompat;
@@ -12,6 +14,7 @@ import com.nti.nice_gallery.models.ModelMediaTreeItem;
 import com.nti.nice_gallery.models.ModelStorage;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
@@ -25,9 +28,11 @@ import kotlin.jvm.functions.Function3;
 public class ManagerOfFiles_Test1 implements IManagerOfFiles {
 
     private final Context context;
+    private final ContentResolver contentResolver;
 
     public ManagerOfFiles_Test1(Context context) {
         this.context = context;
+        this.contentResolver = context.getContentResolver();
     }
 
     // Возвращает спсиок случайно сгенерированных файлов
@@ -83,11 +88,21 @@ public class ManagerOfFiles_Test1 implements IManagerOfFiles {
                 return null;
             }
 
+            String[] imageExtensions = Arrays.stream(ModelMediaTreeItem.supportedMediaFormats)
+                    .filter(f -> f.type == ModelMediaTreeItem.Type.Image)
+                    .map(f -> f.fileExtension)
+                    .toArray(String[]::new);
+
+            String[] videoExtensions = Arrays.stream(ModelMediaTreeItem.supportedMediaFormats)
+                    .filter(f -> f.type == ModelMediaTreeItem.Type.Video)
+                    .map(f -> f.fileExtension)
+                    .toArray(String[]::new);
+
             if (type == ModelMediaTreeItem.Type.Image) {
-                return ModelMediaTreeItem.supportedImageExtensions[random.nextInt(ModelMediaTreeItem.supportedImageExtensions.length)];
+                return imageExtensions[random.nextInt(imageExtensions.length)];
             }
 
-            return ModelMediaTreeItem.supportedVideoExtensions[random.nextInt(ModelMediaTreeItem.supportedVideoExtensions.length)];
+            return videoExtensions[random.nextInt(videoExtensions.length)];
         };
 
         Function3<ModelMediaTreeItem.Type, Integer, String, String> randomName = (type, i, extension) -> {
@@ -143,15 +158,14 @@ public class ManagerOfFiles_Test1 implements IManagerOfFiles {
             Size resolution = randomSize.invoke(type);
             Integer duration = randomDuration.invoke(type);
 
-            items.add(new ModelMediaTreeItem(name, path, type, weight, createdAt, updatedAt, resolution, extension, duration));
+            items.add(new ModelMediaTreeItem((long)i, name, path, type, weight, createdAt, updatedAt, resolution, extension, duration));
         }
 
         return items;
     }
 
-    // Возвращает заглушку соответсвующего размера
     @Override
-    public Bitmap getItemPreviewAsBitmap(ModelMediaTreeItem item) {
+    public Bitmap getItemThumbnail(ModelMediaTreeItem item) {
         if (item.resolution == null) {
             return ((BitmapDrawable)(ContextCompat.getDrawable(context, R.drawable.placeholder_960x960))).getBitmap();
         } else if (item.resolution.getWidth() == 1920) {
@@ -159,6 +173,22 @@ public class ManagerOfFiles_Test1 implements IManagerOfFiles {
         } else {
             return ((BitmapDrawable)(ContextCompat.getDrawable(context, R.drawable.placeholder_1080x1920))).getBitmap();
         }
+    }
+
+    @Override
+    public Uri getItemContentUri(ModelMediaTreeItem item) {
+        int drawableId;
+
+        if (item.resolution == null) {
+            drawableId = R.drawable.placeholder_960x960;
+        } else if (item.resolution.getWidth() == 1920) {
+            drawableId = R.drawable.placeholder_1920x1080;
+        } else {
+            drawableId = R.drawable.placeholder_1080x1920;
+        }
+
+        return Uri.parse(ContentResolver.SCHEME_ANDROID_RESOURCE + "://" +
+                context.getPackageName() + "/" + drawableId);
     }
 
     // Возращает примерный список хранилищ

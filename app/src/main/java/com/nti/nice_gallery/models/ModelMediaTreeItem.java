@@ -6,14 +6,21 @@ import java.util.Date;
 
 public class ModelMediaTreeItem {
 
-    public static final String[] supportedImageExtensions = new String[] { "png", "jpg", "bmp" };
-    public static final String[] supportedVideoExtensions = new String[] { "mp4", "wmv" };
+    public static final ModelFileFormat[] supportedMediaFormats = new ModelFileFormat[] {
+            new ModelFileFormat("image/png", "png", Type.Image),
+            new ModelFileFormat("image/jpeg", "jpg", Type.Image),
+            new ModelFileFormat("image/jpg", "jpg", Type.Image),
+            new ModelFileFormat("image/bmp", "bmp", Type.Image),
+            new ModelFileFormat("video/mp4", "mp4", Type.Video),
+            new ModelFileFormat("video/x-ms-wmv", "wmv", Type.Video)
+    };
 
     public enum Type { Image, Video, Folder }
 
     public @interface ForFilesOnly {}
     public @interface ForVideosOnly {}
 
+    public final Long mediaId;
     public final String name;
     public final String path;
     public final Type type;
@@ -27,6 +34,7 @@ public class ModelMediaTreeItem {
     @ForVideosOnly public final Integer duration;
 
     public ModelMediaTreeItem(
+            Long mediaId,
             String name,
             String path,
             Type type,
@@ -37,6 +45,7 @@ public class ModelMediaTreeItem {
             @ForFilesOnly String extension,
             @ForVideosOnly Integer duration
     ) {
+        this.mediaId = mediaId;
         this.name = name;
         this.path = path;
         this.type = type;

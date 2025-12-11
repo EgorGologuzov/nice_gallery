@@ -89,7 +89,8 @@ public class GridItemLine extends GridItemBase {
             infoView2.setVisibility(GONE);
         }
 
-        imageView.setImageBitmap(managerOfFiles.getItemPreviewAsBitmap(model));
+        imageView.setImageBitmap(managerOfFiles.getItemThumbnail(model));
+//        imageView.setImageURI(managerOfFiles.getItemContentUri(model));
         nameView.setText(model.name);
         pathView.setText(model.path);
         infoView.setText(info);

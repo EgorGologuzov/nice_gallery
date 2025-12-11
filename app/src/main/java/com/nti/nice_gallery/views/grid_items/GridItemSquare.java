@@ -104,7 +104,8 @@ public class GridItemSquare extends GridItemBase {
 
         String infoString = String.join(getContext().getResources().getString(R.string.symbol_dot_separator), infoItems);
 
-        imageView.setImageBitmap(managerOfFiles.getItemPreviewAsBitmap(model));
+        imageView.setImageBitmap(managerOfFiles.getItemThumbnail(model));
+//        imageView.setImageURI(managerOfFiles.getItemContentUri(model));
         infoView.setText(infoString);
     }
 }
