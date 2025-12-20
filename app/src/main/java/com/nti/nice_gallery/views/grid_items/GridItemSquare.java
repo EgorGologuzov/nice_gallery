@@ -12,14 +12,14 @@ import androidx.annotation.Nullable;
 import com.nti.nice_gallery.R;
 import com.nti.nice_gallery.data.Domain;
 import com.nti.nice_gallery.data.IManagerOfFiles;
-import com.nti.nice_gallery.models.ModelMediaTreeItem;
+import com.nti.nice_gallery.models.ModelMediaFile;
 import com.nti.nice_gallery.utils.Convert;
 
 import java.util.ArrayList;
 
 public class GridItemSquare extends GridItemBase {
 
-    private ModelMediaTreeItem model;
+    private ModelMediaFile model;
     private boolean isInfoHidden;
 
     private TextView infoView;
@@ -60,11 +60,11 @@ public class GridItemSquare extends GridItemBase {
         convert = new Convert(getContext());
     }
 
-    public ModelMediaTreeItem getModel() {
+    public ModelMediaFile getModel() {
         return model;
     }
 
-    public void setModel(ModelMediaTreeItem model) {
+    public void setModel(ModelMediaFile model) {
         this.model = model;
         updateView();
     }
@@ -81,20 +81,20 @@ public class GridItemSquare extends GridItemBase {
     private void updateView() {
         ArrayList<String> infoItems = new ArrayList<>();
 
-        if (model.type == ModelMediaTreeItem.Type.Folder) {
+        if (model.type == ModelMediaFile.Type.Folder) {
             infoItems.add(model.name);
             infoItems.add(convert.weightToString(model.weight));
-        } else if (model.type == ModelMediaTreeItem.Type.Image) {
+        } else if (model.type == ModelMediaFile.Type.Image) {
             infoItems.add(model.extension.toUpperCase());
             infoItems.add(convert.weightToString(model.weight));
-        } else if (model.type == ModelMediaTreeItem.Type.Video) {
+        } else if (model.type == ModelMediaFile.Type.Video) {
             infoItems.add(getContext().getResources().getString(R.string.symbol_play_video));
             infoItems.add(convert.durationToTimeString(model.duration));
             infoItems.add(convert.weightToString(model.weight));
         }
 
         if (isInfoHidden) {
-            if (model.type == ModelMediaTreeItem.Type.Video) {
+            if (model.type == ModelMediaFile.Type.Video) {
                 infoItems.clear();
                 infoItems.add(getContext().getResources().getString(R.string.symbol_play_video));
             } else {
@@ -104,7 +104,7 @@ public class GridItemSquare extends GridItemBase {
 
         String infoString = String.join(getContext().getResources().getString(R.string.symbol_dot_separator), infoItems);
 
-        imageView.setImageBitmap(managerOfFiles.getItemThumbnail(model));
+        imageView.setImageBitmap(managerOfFiles.getFilePreview(model));
 //        imageView.setImageURI(managerOfFiles.getItemContentUri(model));
         infoView.setText(infoString);
     }

@@ -2,7 +2,6 @@ package com.nti.nice_gallery.views;
 
 import android.content.Context;
 import android.util.AttributeSet;
-import android.util.Log;
 import android.util.Size;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -10,7 +9,7 @@ import android.widget.ScrollView;
 import androidx.annotation.Nullable;
 
 import com.nti.nice_gallery.R;
-import com.nti.nice_gallery.models.ModelMediaTreeItem;
+import com.nti.nice_gallery.models.ModelMediaFile;
 import com.nti.nice_gallery.utils.Convert;
 import com.nti.nice_gallery.views.grid_items.GridItemLine;
 import com.nti.nice_gallery.views.grid_items.GridItemQuilt;
@@ -26,7 +25,7 @@ public class ViewMediaGrid extends ScrollView {
     public enum GridVariant { List, ThreeColumns, SixColumns, Quilt }
 
     private LinearLayout container;
-    private List<ModelMediaTreeItem> items;
+    private List<ModelMediaFile> items;
     private GridVariant gridVariant = GridVariant.ThreeColumns;
 
     public ViewMediaGrid(Context context) {
@@ -59,11 +58,11 @@ public class ViewMediaGrid extends ScrollView {
         updateGrid();
     }
 
-    public List<ModelMediaTreeItem> getItems() {
+    public List<ModelMediaFile> getItems() {
         return items;
     }
 
-    public void setItems(List<ModelMediaTreeItem> items) {
+    public void setItems(List<ModelMediaFile> items) {
         this.items = items;
         updateGrid();
     }
@@ -120,7 +119,7 @@ public class ViewMediaGrid extends ScrollView {
 
     private void listVariantUpdate() {
         container.removeAllViews();
-        for (ModelMediaTreeItem item : items) {
+        for (ModelMediaFile item : items) {
             GridItemLine itemView = new GridItemLine(getContext());
             itemView.setModel(item);
             container.addView(itemView);
@@ -134,7 +133,7 @@ public class ViewMediaGrid extends ScrollView {
         container.removeAllViews();
 
         LinearLayout row = null;
-        for (ModelMediaTreeItem item : items) {
+        for (ModelMediaFile item : items) {
             if (row == null) {
                 row = new LinearLayout(getContext());
                 row.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
@@ -170,11 +169,11 @@ public class ViewMediaGrid extends ScrollView {
         int displayWidth = getResources().getDisplayMetrics().widthPixels;
         Convert convert = new Convert(getContext());
         LinearLayout rowLayout = null;
-        ArrayList<ModelMediaTreeItem> rowItems = null;
+        ArrayList<ModelMediaFile> rowItems = null;
         ArrayList<Float> rowWidths = null;
         ArrayList<Float> rowHeights = null;
 
-        for (ModelMediaTreeItem item : items) {
+        for (ModelMediaFile item : items) {
             if (rowLayout == null) {
                 rowLayout = new LinearLayout(getContext());
                 rowLayout.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));

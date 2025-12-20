@@ -6,7 +6,7 @@ import java.util.Date;
 import java.util.List;
 
 public class ModelFilters {
-    @Nullable public List<ModelMediaTreeItem.Type> types;
+    @Nullable public List<ModelMediaFile.Type> types;
     @Nullable public Long minWeight;
     @Nullable public Long maxWeight;
     @Nullable public Date minCreateDate;

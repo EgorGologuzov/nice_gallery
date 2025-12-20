@@ -11,10 +11,9 @@ import android.provider.MediaStore;
 import android.util.Log;
 import android.util.Size;
 
-import com.nti.nice_gallery.models.ModelMediaTreeItem;
+import com.nti.nice_gallery.models.ModelMediaFile;
 import com.nti.nice_gallery.models.ModelStorage;
 
-import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -36,26 +35,327 @@ public class ManagerOfFiles implements IManagerOfFiles {
     }
 
     @Override
-    public List<ModelMediaTreeItem> getAllFiles() {
-        List<ModelMediaTreeItem> mediaList = new ArrayList<>();
+    public List<ModelMediaFile> getAllFiles() {
+        List<ModelMediaFile> mediaList = new ArrayList<>();
 
+        // Существующий код для внутреннего хранилища и SD-карты
         mediaList.addAll(getMediaFromMediaStore(MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                ModelMediaTreeItem.Type.Image));
+                ModelMediaFile.Type.Image));
 
         mediaList.addAll(getMediaFromMediaStore(MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
-                ModelMediaTreeItem.Type.Video));
+                ModelMediaFile.Type.Video));
+
+        // Новый код для USB флешки
+//        mediaList.addAll(getMediaFromExternalVolumes(ModelMediaTreeItem.Type.Image));
+//        mediaList.addAll(getMediaFromExternalVolumes(ModelMediaTreeItem.Type.Video));
+
+        // Дополнительно: сканируем USB напрямую через файловую систему
+        mediaList.addAll(scanUsbStorageDirectly());
 
         return mediaList;
     }
 
-    @Override
-    public Bitmap getItemThumbnail(ModelMediaTreeItem item) {
-        return getItemThumbnailFromMediaStore(item);
+    private List<ModelMediaFile> scanUsbStorageDirectly() {
+        List<ModelMediaFile> mediaList = new ArrayList<>();
+
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+            // Для Android 11+ с MANAGE_EXTERNAL_STORAGE
+            if (!android.provider.Settings.canDrawOverlays(context)) {
+                // Проверяем, есть ли разрешение на полный доступ
+                try {
+                    if (!android.os.Environment.isExternalStorageManager()) {
+                        Log.w(getClass().getName(), "No MANAGE_EXTERNAL_STORAGE permission");
+                        return mediaList;
+                    }
+                } catch (Exception e) {
+                    Log.e(getClass().getName(), "Error checking storage permission: " + e.getMessage());
+                    return mediaList;
+                }
+            }
+        }
+
+        // Ищем USB устройства
+        List<java.io.File> usbRoots = findUsbStorageRoots();
+
+        for (java.io.File usbRoot : usbRoots) {
+            Log.d(getClass().getName(), "Scanning USB root: " + usbRoot.getAbsolutePath());
+            scanDirectoryForMediaFiles(usbRoot, mediaList);
+        }
+
+        return mediaList;
+    }
+
+    private boolean isUsbStorage(String path) {
+        // Проверяем по ключевым словам в пути
+        String lowerPath = path.toLowerCase();
+        return lowerPath.contains("usb") ||
+                lowerPath.contains("otg") ||
+                lowerPath.contains("udisk") ||
+                lowerPath.contains("media_rw");
+    }
+
+    private List<java.io.File> findUsbStorageRoots() {
+        List<java.io.File> usbRoots = new ArrayList<>();
+
+        try {
+            // Способ 1: Получаем все точки монтирования через getExternalFilesDirs
+            java.io.File[] externalDirs = context.getExternalFilesDirs(null);
+
+            for (int i = 1; i < externalDirs.length; i++) { // Начинаем с 1, т.к. 0 - внутреннее хранилище
+                java.io.File dir = externalDirs[i];
+                if (dir != null) {
+                    // Получаем корневой каталог хранилища
+                    java.io.File storageRoot = getStorageRootFromAppDir(dir);
+                    if (storageRoot != null && storageRoot.exists() && isUsbStorage(storageRoot.getPath())) {
+                        usbRoots.add(storageRoot);
+                    }
+                }
+            }
+
+            // Способ 2: Проверяем известные пути монтирования USB
+            String[] knownUsbPaths = {
+                    "/storage/usb",
+                    "/mnt/usb",
+                    "/storage/usb0",
+                    "/storage/usb1",
+                    "/storage/usbotg",
+                    "/mnt/usbotg",
+                    "/storage/udisk",
+                    "/mnt/udisk",
+                    "/storage/USB",
+                    "/mnt/USB",
+                    "/storage/USB0",
+                    "/storage/USB1"
+            };
+
+            for (String path : knownUsbPaths) {
+                java.io.File usbDir = new java.io.File(path);
+                if (usbDir.exists() && usbDir.canRead() && usbDir.isDirectory()) {
+                    usbRoots.add(usbDir);
+                }
+            }
+
+            // Способ 3: Сканируем /storage и /mnt
+            scanForStorageInDirectory(new java.io.File("/storage"), usbRoots);
+            scanForStorageInDirectory(new java.io.File("/mnt"), usbRoots);
+
+        } catch (Exception e) {
+            Log.e(getClass().getName(), "Error finding USB roots: " + e.getMessage());
+        }
+
+        // Убираем дубликаты
+        return new ArrayList<>(new java.util.LinkedHashSet<>(usbRoots));
+    }
+
+    private void scanForStorageInDirectory(java.io.File dir, List<java.io.File> storageList) {
+        if (!dir.exists() || !dir.isDirectory() || !dir.canRead()) {
+            return;
+        }
+
+        try {
+            java.io.File[] files = dir.listFiles();
+            if (files == null) return;
+
+            for (java.io.File file : files) {
+                if (file.isDirectory() && file.canRead()) {
+                    String name = file.getName();
+
+                    // Пропускаем системные директории
+                    if (name.startsWith(".") ||
+                            "emulated".equals(name) ||
+                            "self".equals(name) ||
+                            "android".equals(name)) {
+                        continue;
+                    }
+
+                    // Проверяем, похоже ли это на USB хранилище
+                    if (isLikelyUsbStorage(file)) {
+                        storageList.add(file);
+                    }
+
+                    // Также проверяем поддиректории типа /storage/XXXX-XXXX
+                    if (name.matches("[0-9A-F]{4}-[0-9A-F]{4}")) { // Паттерн типа 1234-ABCD
+                        storageList.add(file);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Log.e(getClass().getName(), "Error scanning directory: " + e.getMessage());
+        }
+    }
+
+    private boolean isLikelyUsbStorage(java.io.File dir) {
+        String path = dir.getAbsolutePath().toLowerCase();
+        String name = dir.getName().toLowerCase();
+
+        // Проверяем по ключевым словам
+        boolean hasUsbKeyword = path.contains("usb") || name.contains("usb") ||
+                path.contains("otg") || name.contains("otg") ||
+                path.contains("udisk") || name.contains("udisk");
+
+        // Проверяем, есть ли типичные папки в хранилище
+        if (!hasUsbKeyword) {
+            java.io.File[] subDirs = dir.listFiles();
+            if (subDirs != null) {
+                for (java.io.File subDir : subDirs) {
+                    String subName = subDir.getName().toLowerCase();
+                    if (subName.equals("dcim") || subName.equals("pictures") ||
+                            subName.equals("movies") || subName.equals("download")) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return hasUsbKeyword;
+    }
+
+    private java.io.File getStorageRootFromAppDir(java.io.File appDir) {
+        try {
+            String path = appDir.getAbsolutePath();
+
+            // Паттерн: /storage/XXXX-XXXX/Android/data/package/files
+            java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("(/storage/[^/]+)/Android/data/");
+            java.util.regex.Matcher matcher = pattern.matcher(path);
+
+            if (matcher.find()) {
+                return new java.io.File(matcher.group(1));
+            }
+
+            // Альтернативный путь
+            pattern = java.util.regex.Pattern.compile("(/mnt/[^/]+)/Android/data/");
+            matcher = pattern.matcher(path);
+            if (matcher.find()) {
+                return new java.io.File(matcher.group(1));
+            }
+
+            // Простой способ: поднимаемся на 3 уровня вверх
+            java.io.File current = appDir;
+            for (int i = 0; i < 3 && current != null; current = current.getParentFile(), i++);
+
+            return current;
+
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private void scanDirectoryForMediaFiles(java.io.File dir, List<ModelMediaFile> mediaList) {
+        if (!dir.exists() || !dir.canRead()) {
+            return;
+        }
+
+        // Ограничиваем сканирование определенными папками для производительности
+        String[] mediaFolders = {"DCIM", "Pictures", "Photos", "Camera", "Movies", "Videos", "Download"};
+
+        for (String folder : mediaFolders) {
+            java.io.File mediaDir = new java.io.File(dir, folder);
+            if (mediaDir.exists() && mediaDir.isDirectory()) {
+                scanDirectoryRecursiveForMedia(mediaDir, mediaList, 0);
+            }
+        }
+
+        // Также сканируем корень, но с меньшей глубиной
+        scanDirectoryRecursiveForMedia(dir, mediaList, 2);
+    }
+
+    private void scanDirectoryRecursiveForMedia(java.io.File dir, List<ModelMediaFile> mediaList, int depth) {
+        if (depth > 5 || dir == null || !dir.exists() || !dir.canRead()) {
+            return;
+        }
+
+        try {
+            java.io.File[] files = dir.listFiles();
+            if (files == null) return;
+
+            for (java.io.File file : files) {
+                if (file.isDirectory()) {
+                    // Пропускаем скрытые и системные папки
+                    String name = file.getName();
+                    if (!name.startsWith(".") && !name.equals("Android") && !name.equals("Lost+Found")) {
+                        scanDirectoryRecursiveForMedia(file, mediaList, depth + 1);
+                    }
+                } else if (file.isFile()) {
+                    // Проверяем и добавляем медиафайл
+                    ModelMediaFile mediaItem = createMediaItemFromFile(file);
+                    if (mediaItem != null) {
+                        mediaList.add(mediaItem);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Log.e(getClass().getName(), "Error scanning directory: " + e.getMessage());
+        }
+    }
+
+    private ModelMediaFile createMediaItemFromFile(java.io.File file) {
+        try {
+            String name = file.getName();
+            String path = file.getAbsolutePath();
+            long size = file.length();
+            Date createAt = new Date(file.lastModified());
+            Date updateAt = new Date(file.lastModified());
+
+            // Определяем тип файла по расширению
+            ModelMediaFile.Type type = getMediaTypeFromFile(file);
+            if (type == null) {
+                return null;
+            }
+
+            String extension = "";
+            int lastDot = name.lastIndexOf('.');
+            if (lastDot > 0) {
+                extension = name.substring(lastDot + 1);
+            }
+
+            // Получаем размеры для изображений (для видео это сложнее без декодирования)
+            android.graphics.BitmapFactory.Options options = new android.graphics.BitmapFactory.Options();
+            options.inJustDecodeBounds = true;
+            android.graphics.BitmapFactory.decodeFile(path, options);
+
+            android.util.Size resolution = new android.util.Size(options.outWidth, options.outHeight);
+
+            return new ModelMediaFile(
+                    -1L, // ID для файлов, найденных напрямую
+                    name,
+                    path,
+                    type,
+                    size,
+                    createAt,
+                    updateAt,
+                    resolution,
+                    extension,
+                    null // duration - для видео нужно отдельно определять
+            );
+
+        } catch (Exception e) {
+            Log.e(getClass().getName(), "Error creating media item from file: " + e.getMessage());
+            return null;
+        }
+    }
+
+    private ModelMediaFile.Type getMediaTypeFromFile(java.io.File file) {
+        String name = file.getName().toLowerCase();
+
+        if (name.endsWith(".jpg") || name.endsWith(".jpeg") ||
+                name.endsWith(".png") || name.endsWith(".gif") ||
+                name.endsWith(".bmp") || name.endsWith(".webp")) {
+            return ModelMediaFile.Type.Image;
+        }
+
+        if (name.endsWith(".mp4") || name.endsWith(".avi") ||
+                name.endsWith(".mkv") || name.endsWith(".mov") ||
+                name.endsWith(".wmv") || name.endsWith(".flv") ||
+                name.endsWith(".3gp") || name.endsWith(".m4v")) {
+            return ModelMediaFile.Type.Video;
+        }
+
+        return null;
     }
 
     @Override
-    public Uri getItemContentUri(ModelMediaTreeItem item) {
-        return getContentUriFromMediaStore(item);
+    public Bitmap getFilePreview(ModelMediaFile item) {
+        return getItemThumbnailFromMediaStore(item);
     }
 
     @Override
@@ -64,7 +364,7 @@ public class ManagerOfFiles implements IManagerOfFiles {
     }
 
     @SuppressLint("Range")
-    private List<ModelMediaTreeItem> getMediaFromMediaStore(Uri contentUri, ModelMediaTreeItem.Type type) {
+    private List<ModelMediaFile> getMediaFromMediaStore(Uri contentUri, ModelMediaFile.Type type) {
 
         String[] imageProjection = new String[] {
                 MediaStore.Images.Media._ID,
@@ -78,6 +378,7 @@ public class ManagerOfFiles implements IManagerOfFiles {
                 MediaStore.Images.Media.MIME_TYPE,
                 MediaStore.Images.Media.ORIENTATION
         };
+
         String[] videoProjection = new String[] {
                 MediaStore.Video.Media._ID,
                 MediaStore.Video.Media.DISPLAY_NAME,
@@ -92,13 +393,13 @@ public class ManagerOfFiles implements IManagerOfFiles {
                 MediaStore.Video.Media.ORIENTATION
         };
 
-        String[] projection = type == ModelMediaTreeItem.Type.Image ? imageProjection : videoProjection;
+        String[] projection = type == ModelMediaFile.Type.Image ? imageProjection : videoProjection;
         String sortOrder = MediaStore.MediaColumns.DATE_ADDED + " DESC";
 
-        List<ModelMediaTreeItem> mediaList = new ArrayList<>();
+        List<ModelMediaFile> mediaList = new ArrayList<>();
 
         Function1<String, Boolean> isSupportedFormat = mimeType ->
-                Arrays.stream(ModelMediaTreeItem.supportedMediaFormats)
+                Arrays.stream(ModelMediaFile.supportedMediaFormats)
                         .anyMatch(f -> f.mimeType.equalsIgnoreCase(mimeType));
 
         Function1<String, String> getFileExtension = fileName -> {
@@ -123,7 +424,7 @@ public class ManagerOfFiles implements IManagerOfFiles {
             int orientationColumn = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.ORIENTATION);
 
             int durationColumn = -1;
-            if (type == ModelMediaTreeItem.Type.Video) {
+            if (type == ModelMediaFile.Type.Video) {
                 durationColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DURATION);
             }
 
@@ -149,11 +450,11 @@ public class ManagerOfFiles implements IManagerOfFiles {
                     Size resolution = orientation == 90 || orientation == 270 ? new Size(height, width) : new Size(width, height);
 
                     Integer duration = null;
-                    if (type == ModelMediaTreeItem.Type.Video && durationColumn != -1) {
+                    if (type == ModelMediaFile.Type.Video && durationColumn != -1) {
                         duration = (int) (cursor.getLong(durationColumn) / 1000);
                     }
 
-                    ModelMediaTreeItem item = new ModelMediaTreeItem(
+                    mediaList.add(new ModelMediaFile(
                             mediaId,
                             name,
                             path,
@@ -164,25 +465,21 @@ public class ManagerOfFiles implements IManagerOfFiles {
                             resolution,
                             extension,
                             duration
-                    );
-
-                    Log.d("QUILT_ALGORITHM", String.format("%s: %dx%d", item.path, item.resolution.getWidth(), item.resolution.getHeight()));
-
-                    mediaList.add(item);
+                    ));
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    Log.e(getClass().getName(), "Failed to read file properties: " + e.getMessage());
                 }
             } while (cursor.moveToNext());
         } catch (Exception e) {
-            e.printStackTrace();
+            Log.e(getClass().getName(), "Failed to read files: " + e.getMessage());
         }
 
         return mediaList;
     }
 
-    private Bitmap getItemThumbnailFromMediaStore(ModelMediaTreeItem item) {
+    private Bitmap getItemThumbnailFromMediaStore(ModelMediaFile item) {
         try {
-            Uri contentUri = (item.type == ModelMediaTreeItem.Type.Image)
+            Uri contentUri = (item.type == ModelMediaFile.Type.Image)
                     ? MediaStore.Images.Media.EXTERNAL_CONTENT_URI
                     : MediaStore.Video.Media.EXTERNAL_CONTENT_URI;
 
@@ -192,24 +489,9 @@ public class ManagerOfFiles implements IManagerOfFiles {
                     null
             );
         } catch (Exception e) {
-            e.printStackTrace();
+            Log.e(getClass().getName(), "Failed to get thumbnail: " + e.getMessage());
             return null;
         }
     }
 
-    private Uri getContentUriFromMediaStore(ModelMediaTreeItem item) {
-        if (item.type == ModelMediaTreeItem.Type.Image) {
-            return ContentUris.withAppendedId(
-                    MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                    item.mediaId
-            );
-        } else if (item.type == ModelMediaTreeItem.Type.Video) {
-            return ContentUris.withAppendedId(
-                    MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
-                    item.mediaId
-            );
-        }
-
-        return Uri.fromFile(new File(item.path));
-    }
 }

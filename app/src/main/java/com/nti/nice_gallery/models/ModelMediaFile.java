@@ -4,11 +4,11 @@ import android.util.Size;
 
 import java.util.Date;
 
-public class ModelMediaTreeItem {
+public class ModelMediaFile {
 
     public static final ModelFileFormat[] supportedMediaFormats = new ModelFileFormat[] {
             new ModelFileFormat("image/png", "png", Type.Image),
-            new ModelFileFormat("image/jpeg", "jpg", Type.Image),
+            new ModelFileFormat("image/jpeg", "jpeg", Type.Image),
             new ModelFileFormat("image/jpg", "jpg", Type.Image),
             new ModelFileFormat("image/bmp", "bmp", Type.Image),
             new ModelFileFormat("video/mp4", "mp4", Type.Video),
@@ -33,7 +33,7 @@ public class ModelMediaTreeItem {
 
     @ForVideosOnly public final Integer duration;
 
-    public ModelMediaTreeItem(
+    public ModelMediaFile(
             Long mediaId,
             String name,
             String path,
