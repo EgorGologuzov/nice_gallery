@@ -10,6 +10,7 @@ import androidx.annotation.Nullable;
 
 import com.nti.nice_gallery.R;
 import com.nti.nice_gallery.models.ModelMediaFile;
+import com.nti.nice_gallery.models.ReadOnlyList;
 import com.nti.nice_gallery.utils.Convert;
 import com.nti.nice_gallery.views.grid_items.GridItemLine;
 import com.nti.nice_gallery.views.grid_items.GridItemQuilt;
@@ -25,7 +26,7 @@ public class ViewMediaGrid extends ScrollView {
     public enum GridVariant { List, ThreeColumns, SixColumns, Quilt }
 
     private LinearLayout container;
-    private List<ModelMediaFile> items;
+    private ReadOnlyList<ModelMediaFile> items;
     private GridVariant gridVariant = GridVariant.ThreeColumns;
 
     public ViewMediaGrid(Context context) {
@@ -58,11 +59,11 @@ public class ViewMediaGrid extends ScrollView {
         updateGrid();
     }
 
-    public List<ModelMediaFile> getItems() {
+    public ReadOnlyList<ModelMediaFile> getItems() {
         return items;
     }
 
-    public void setItems(List<ModelMediaFile> items) {
+    public void setItems(ReadOnlyList<ModelMediaFile> items) {
         this.items = items;
         updateGrid();
     }
@@ -141,8 +142,8 @@ public class ViewMediaGrid extends ScrollView {
             }
 
             GridItemSquare itemView = new GridItemSquare(getContext());
-            itemView.setModel(item);
             itemView.setIsInfoHidden(columnsCount > HIDE_ITEM_DATA_IF_COLUMNS_COUNT_MORE_THAN);
+            itemView.setModel(item);
             row.addView(itemView);
 
             if (row.getChildCount() == columnsCount) {

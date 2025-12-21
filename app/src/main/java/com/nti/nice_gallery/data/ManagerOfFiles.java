@@ -16,10 +16,14 @@ import androidx.core.content.ContextCompat;
 
 import com.nti.nice_gallery.R;
 import com.nti.nice_gallery.models.ModelFileFormat;
+import com.nti.nice_gallery.models.ModelGetFilesRequest;
+import com.nti.nice_gallery.models.ModelGetFilesResponse;
 import com.nti.nice_gallery.models.ModelMediaFile;
 import com.nti.nice_gallery.models.ModelStorage;
+import com.nti.nice_gallery.models.ReadOnlyList;
 
 import java.io.File;
+import java.io.FileFilter;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.attribute.BasicFileAttributes;
@@ -33,19 +37,191 @@ import kotlin.jvm.functions.Function2;
 public class ManagerOfFiles implements IManagerOfFiles {
 
     private static final String LOG_TAG = "ManagerOfFiles";
-    private static Bitmap FOLDER_PLACEHOLDER;
 
     private final Context context;
 
     public ManagerOfFiles(Context context) {
         this.context = context;
-        if (FOLDER_PLACEHOLDER == null) {
-            FOLDER_PLACEHOLDER = ((BitmapDrawable)(ContextCompat.getDrawable(context, R.drawable.placeholder_960x960))).getBitmap();
-        }
     }
 
     @Override
-    public List<ModelMediaFile> getAllFiles() {
+    public ModelGetFilesResponse getFiles(ModelGetFilesRequest request) {
+
+        Function1<ModelStorage, List<ModelMediaFile>> getStorageFiles = storage -> {
+            List<ModelMediaFile> files = new ArrayList<>();
+
+            try {
+                File storageFolder = new File(storage.path);
+                recursionScanning(storageFolder, files);
+            } catch (Exception e) {
+                Log.e(LOG_TAG, e.getMessage());
+            }
+
+            return files;
+        };
+
+        final List<ModelStorage> storages = getAllStorages();
+        final List<ModelMediaFile> files = new ArrayList<>();
+        final List<ModelStorage> storagesWithErrors = new ArrayList<>();
+        final List<ModelMediaFile> filesWithErrors = new ArrayList<>();
+
+        for (ModelStorage storage : storages) {
+            if (storage.error == null) {
+                List<ModelMediaFile> storageFiles = getStorageFiles.invoke(storage);
+                files.addAll(storageFiles);
+                for (ModelMediaFile file : storageFiles) {
+                    if (file.error != null) {
+                        filesWithErrors.add(file);
+                    }
+                }
+            } else {
+                storagesWithErrors.add(storage);
+            }
+        }
+
+        return new ModelGetFilesResponse(
+                new ReadOnlyList<>(files),
+                new ReadOnlyList<>(storages),
+                new ReadOnlyList<>(filesWithErrors),
+                new ReadOnlyList<>(storagesWithErrors)
+        );
+    }
+
+    @Override
+    public Bitmap getFilePreview(ModelMediaFile item) {
+
+        final Size TARGET_PREVIEW_RESOLUTION = new Size(250, 250);
+        final int VIDEO_PREVIEW_TIMING = 0;
+
+        Function1<ModelMediaFile, Integer> calcInSampleSize = _item -> {
+
+            final int reqWidth = TARGET_PREVIEW_RESOLUTION.getWidth();
+            final int reqHeight = TARGET_PREVIEW_RESOLUTION.getHeight();
+            int width = _item.width;
+            int height = _item.height;
+            int inSampleSize = 1;
+
+            if (height > reqHeight || width > reqWidth) {
+                final int halfHeight = height / 2;
+                final int halfWidth = width / 2;
+                while ((halfHeight / inSampleSize) >= reqHeight && (halfWidth / inSampleSize) >= reqWidth) {
+                    inSampleSize *= 2;
+                }
+            }
+
+            return inSampleSize;
+        };
+
+        Function2<Bitmap, Integer, Bitmap> rotateBitmap = (source, angle) -> {
+            if (source == null || angle == 0) return source;
+            Matrix matrix = new Matrix();
+            matrix.postRotate(angle);
+            return Bitmap.createBitmap(source, 0, 0, source.getWidth(), source.getHeight(), matrix, true);
+        };
+
+        Function1<ModelMediaFile, Bitmap> getImagePreview = _item -> {
+            BitmapFactory.Options options = new BitmapFactory.Options();
+            options.inSampleSize = calcInSampleSize.invoke(_item);
+            options.inPreferredConfig = android.graphics.Bitmap.Config.RGB_565;
+            Bitmap result = BitmapFactory.decodeFile(item.path, options);
+            return rotateBitmap.invoke(result, _item.rotation);
+        };
+
+        Function1<ModelMediaFile, Bitmap> getVideoPreview = _item -> {
+            try (MediaMetadataRetriever retriever = new MediaMetadataRetriever()) {
+                retriever.setDataSource(_item.path);
+                return retriever.getScaledFrameAtTime(
+                        VIDEO_PREVIEW_TIMING,
+                        android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
+                        TARGET_PREVIEW_RESOLUTION.getWidth(),
+                        TARGET_PREVIEW_RESOLUTION.getHeight());
+            } catch (Exception e) {
+                Log.e(LOG_TAG, e.getMessage());
+                return null;
+            }
+        };
+
+        if (item.type == ModelMediaFile.Type.Image) {
+            Bitmap bitmap = getImagePreview.invoke(item);
+            return bitmap;
+        }
+
+        if (item.type == ModelMediaFile.Type.Video) {
+            Bitmap bitmap = getVideoPreview.invoke(item);
+            return bitmap;
+        }
+
+        return null;
+    }
+
+    @Override
+    public List<ModelStorage> getAllStorages() {
+
+        Function1<StorageVolume, ModelStorage> getStorageInfo = volume -> {
+            String name = null;
+            String path = null;
+            ModelStorage.Type type = null;
+            Exception error = null;
+
+            try {
+                File storageDir = volume.getDirectory();
+                path = storageDir.getAbsolutePath();
+
+                name = String.format(context.getResources().getString(R.string.format_name_storage_name),
+                        volume.getDescription(context),
+                        path);
+
+                type = volume.isPrimary()
+                        ? ModelStorage.Type.Primary
+                        : volume.isRemovable()
+                        ? ModelStorage.Type.Removable
+                        : ModelStorage.Type.Else;
+            } catch (Exception e) {
+                error = e;
+                Log.e(LOG_TAG, e.getMessage());
+            }
+
+            return new ModelStorage(
+                    name,
+                    path,
+                    type,
+                    error
+            );
+        };
+
+        List<ModelStorage> storages = new ArrayList<>();
+        StorageManager storageManager = (StorageManager) context.getSystemService(Context.STORAGE_SERVICE);
+        List<StorageVolume> storageVolumes = storageManager.getStorageVolumes();
+
+        for (StorageVolume volume : storageVolumes) {
+            ModelStorage storage = getStorageInfo.invoke(volume);
+            storages.add(storage);
+        }
+
+        return storages;
+    }
+
+    private void recursionScanning(File folder, List<ModelMediaFile> files) {
+        File[] folderFiles = folder.listFiles(file -> !file.isHidden() && !file.getName().startsWith("."));
+
+        if (folderFiles == null || folderFiles.length == 0) {
+            return;
+        }
+
+        for (File file : folderFiles) {
+            if (file.isDirectory()) {
+                recursionScanning(file, files);
+                continue;
+            }
+
+            ModelMediaFile item = getFileInfo(file);
+            if (item != null) {
+                files.add(item);
+            }
+        }
+    }
+
+    private ModelMediaFile getFileInfo(File file) {
 
         class ImageContentInfo {
             public int width;
@@ -60,9 +236,9 @@ public class ManagerOfFiles implements IManagerOfFiles {
             public int duration;
         }
 
-        Function1<File, Date> getFileCreationTime = file -> {
+        Function1<File, Date> getFileCreationTime = _file -> {
             try {
-                BasicFileAttributes attrs = Files.readAttributes(file.toPath(), BasicFileAttributes.class);
+                BasicFileAttributes attrs = Files.readAttributes(_file.toPath(), BasicFileAttributes.class);
                 return new Date(attrs.creationTime().toMillis());
             } catch (IOException e) {
                 Log.e(LOG_TAG, e.getMessage());
@@ -96,9 +272,17 @@ public class ManagerOfFiles implements IManagerOfFiles {
                 return null;
             }
 
-            int width = exif.getAttributeInt(ExifInterface.TAG_IMAGE_WIDTH, 0);
-            int height = exif.getAttributeInt(ExifInterface.TAG_IMAGE_LENGTH, 0);
+            int width = exif.getAttributeInt(ExifInterface.TAG_IMAGE_WIDTH, -1);
+            int height = exif.getAttributeInt(ExifInterface.TAG_IMAGE_LENGTH, -1);
             int rotation = exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL);
+
+            if (width <= 0 || height <= 0) {
+                BitmapFactory.Options options = new BitmapFactory.Options();
+                options.inJustDecodeBounds = true;
+                BitmapFactory.decodeFile(path, options);
+                width = options.outWidth;
+                height = options.outHeight;
+            }
 
             switch (rotation) {
                 case ExifInterface.ORIENTATION_ROTATE_90:
@@ -180,37 +364,34 @@ public class ManagerOfFiles implements IManagerOfFiles {
             return lastIndexOf != -1 ? fileName.substring(lastIndexOf + 1) : null;
         };
 
-        Function1<File, ModelMediaFile> getFileInfo = file -> {
-            String name = file.getName();
+        String name = null;
+        String path = null;
+        ModelMediaFile.Type type = null;
+        Date createAt = null;
+        Date updateAt = null;
+        Long weight = null;
+        Integer width = null;
+        Integer height = null;
+        Integer rotation = null;
+        String extension = null;
+        Integer duration = null;
+        Exception error = null;
+
+        try {
+            name = file.getName();
             Boolean isDirectory = file.isDirectory();
-            ModelMediaFile.Type type = getFileType.invoke(name, isDirectory);
+            type = getFileType.invoke(name, isDirectory);
 
             if (type == null) return null;
 
-            String path = file.getAbsolutePath();
-            Date createAt = getFileCreationTime.invoke(file);
-            Date updatedAt = new Date(file.lastModified());
+            path = file.getAbsolutePath();
+            createAt = getFileCreationTime.invoke(file);
+            updateAt = new Date(file.lastModified());
 
-            if (isDirectory) {
-                return new ModelMediaFile(
-                        name,
-                        path,
-                        type,
-                        createAt,
-                        updatedAt,
-                        null,
-                        FOLDER_PLACEHOLDER.getWidth(),
-                        FOLDER_PLACEHOLDER.getHeight(),
-                        0,
-                        null,
-                        null
-                );
+            if (type != ModelMediaFile.Type.Folder) {
+                weight = file.length();
+                extension = getFileExtension.invoke(name);
             }
-
-            Long weight = file.length();
-            String extension = getFileExtension.invoke(name);
-
-            int width = -1, height = -1, rotation = -1, duration = -1;
 
             if (type == ModelMediaFile.Type.Image) {
                 ImageContentInfo info = getImageContentInfo.invoke(path);
@@ -226,159 +407,24 @@ public class ManagerOfFiles implements IManagerOfFiles {
                 rotation = info.rotation;
                 duration = info.duration;
             }
-
-            return new ModelMediaFile(
-                    name,
-                    path,
-                    type,
-                    createAt,
-                    updatedAt,
-                    weight,
-                    width,
-                    height,
-                    rotation,
-                    extension,
-                    duration
-            );
-        };
-
-        Function1<ModelStorage, List<ModelMediaFile>> getStorageFiles = storage -> {
-            List<ModelMediaFile> files = new ArrayList<>();
-
-            File root = new File(storage.path);
-            File[] dirFiles = root.listFiles();
-
-            if (dirFiles == null) {
-                return files;
-            }
-
-            for (File file : dirFiles) {
-                ModelMediaFile item = getFileInfo.invoke(file);
-                if (item != null) {
-                    files.add(item);
-                }
-            }
-
-            return files;
-        };
-
-        List<ModelStorage> storages = getAllStorages();
-        List<ModelMediaFile> files = new ArrayList<>();
-
-        for (ModelStorage storage : storages) {
-            List<ModelMediaFile> storageFiles = getStorageFiles.invoke(storage);
-            files.addAll(storageFiles);
+        } catch (Exception e) {
+            error = e;
+            Log.e(LOG_TAG, e.getMessage());
         }
 
-        return files;
-    }
-    static int counter = 0;
-    @Override
-    public Bitmap getFilePreview(ModelMediaFile item) {
-
-        final Size TARGET_PREVIEW_RESOLUTION = new Size(250, 250);
-        final int VIDEO_PREVIEW_TIMING = 0;
-
-        Function1<ModelMediaFile, Integer> calcInSampleSize = _item -> {
-
-            final int reqWidth = TARGET_PREVIEW_RESOLUTION.getWidth();
-            final int reqHeight = TARGET_PREVIEW_RESOLUTION.getHeight();
-            int width = _item.width;
-            int height = _item.height;
-            int inSampleSize = 1;
-
-            if (height > reqHeight || width > reqWidth) {
-                final int halfHeight = height / 2;
-                final int halfWidth = width / 2;
-                while ((halfHeight / inSampleSize) >= reqHeight && (halfWidth / inSampleSize) >= reqWidth) {
-                    inSampleSize *= 2;
-                }
-            }
-
-            return inSampleSize;
-        };
-
-        Function2<Bitmap, Integer, Bitmap> rotateBitmap = (source, angle) -> {
-            if (source == null || angle == 0) return source;
-            Matrix matrix = new Matrix();
-            matrix.postRotate(angle);
-            return Bitmap.createBitmap(source, 0, 0, source.getWidth(), source.getHeight(), matrix, true);
-        };
-
-        Function1<ModelMediaFile, Bitmap> getImagePreview = _item -> {
-            BitmapFactory.Options options = new BitmapFactory.Options();
-            options.inSampleSize = calcInSampleSize.invoke(_item);
-            options.inPreferredConfig = android.graphics.Bitmap.Config.RGB_565;
-            Bitmap result = BitmapFactory.decodeFile(item.path, options);
-            return rotateBitmap.invoke(result, _item.rotation);
-        };
-
-        Function1<ModelMediaFile, Bitmap> getVideoPreview = _item -> {
-            try (MediaMetadataRetriever retriever = new MediaMetadataRetriever()) {
-                retriever.setDataSource(_item.path);
-                return retriever.getScaledFrameAtTime(
-                        VIDEO_PREVIEW_TIMING,
-                        android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
-                        TARGET_PREVIEW_RESOLUTION.getWidth(),
-                        TARGET_PREVIEW_RESOLUTION.getHeight());
-            } catch (Exception e) {
-                Log.e(LOG_TAG, e.getMessage());
-                return null;
-            }
-        };
-
-        if (item.type == ModelMediaFile.Type.Image) {
-            Bitmap bitmap = getImagePreview.invoke(item);
-            Log.i(LOG_TAG, "Загрузка превью изображения " + (++counter) + " | " + bitmap.getWidth() + " | " + bitmap.getHeight() + " | " + item.name);
-            return bitmap;
-        }
-
-        if (item.type == ModelMediaFile.Type.Video) {
-            Bitmap bitmap = getVideoPreview.invoke(item);
-            Log.i(LOG_TAG, "Загрузка превью видео " + (++counter) + " | " + bitmap.getWidth() + " | " + bitmap.getHeight() + " | " + item.name);
-            return bitmap;
-        }
-
-        if (item.type == ModelMediaFile.Type.Folder) {
-            return FOLDER_PLACEHOLDER;
-        }
-
-        return null;
-    }
-
-    @Override
-    public List<ModelStorage> getAllStorages() {
-        List<ModelStorage> storages = new ArrayList<>();
-
-        StorageManager storageManager = (StorageManager) context.getSystemService(Context.STORAGE_SERVICE);
-        List<StorageVolume> storageVolumes = storageManager.getStorageVolumes();
-
-        Function1<StorageVolume, ModelStorage> getStorageInfo = volume -> {
-            File storageDir = volume.getDirectory();
-            String path = storageDir.getAbsolutePath();
-
-            String name = String.format(context.getResources().getString(R.string.format_name_storage_name),
-                    volume.getDescription(context),
-                    path);
-
-            ModelStorage.Type type =
-                    volume.isPrimary()
-                    ? ModelStorage.Type.Primary
-                    : volume.isRemovable()
-                    ? ModelStorage.Type.Removable
-                    : ModelStorage.Type.Else;
-
-            return new ModelStorage(
-                    name,
-                    path,
-                    type
-            );
-        };
-
-        for (StorageVolume volume : storageVolumes) {
-            storages.add(getStorageInfo.invoke(volume));
-        }
-
-        return storages;
+        return new ModelMediaFile(
+                name,
+                path,
+                type,
+                createAt,
+                updateAt,
+                weight,
+                width,
+                height,
+                rotation,
+                extension,
+                duration,
+                error
+        );
     }
 }

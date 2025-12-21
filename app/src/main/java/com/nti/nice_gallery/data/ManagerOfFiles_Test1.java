@@ -8,8 +8,11 @@ import android.util.Size;
 import androidx.core.content.ContextCompat;
 
 import com.nti.nice_gallery.R;
+import com.nti.nice_gallery.models.ModelGetFilesRequest;
+import com.nti.nice_gallery.models.ModelGetFilesResponse;
 import com.nti.nice_gallery.models.ModelMediaFile;
 import com.nti.nice_gallery.models.ModelStorage;
+import com.nti.nice_gallery.models.ReadOnlyList;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -47,7 +50,7 @@ public class ManagerOfFiles_Test1 implements IManagerOfFiles {
 
     // Возвращает спсиок случайно сгенерированных файлов
     @Override
-    public List<ModelMediaFile> getAllFiles() {
+    public ModelGetFilesResponse getFiles(ModelGetFilesRequest _) {
 
         final int RANDOM_SEED = 42;
         final int ITEMS_COUNT = 100;
@@ -186,11 +189,17 @@ public class ManagerOfFiles_Test1 implements IManagerOfFiles {
                     height,
                     rotation,
                     extension,
-                    duration
+                    duration,
+                    null
             ));
         }
 
-        return items;
+        return new ModelGetFilesResponse(
+                new ReadOnlyList<>(items),
+                null,
+                null,
+                null
+        );
     }
 
     @Override
@@ -209,9 +218,9 @@ public class ManagerOfFiles_Test1 implements IManagerOfFiles {
     public List<ModelStorage> getAllStorages() {
         List<ModelStorage> list = new ArrayList<>();
 
-        list.add(new ModelStorage("Внутреннее хранилище", "context://internal_storage", ModelStorage.Type.Primary));
-        list.add(new ModelStorage("SD карта", "context://SD-card/hk78cJG435", ModelStorage.Type.Removable));
-        list.add(new ModelStorage("USB накопитель", "context://USB/hgTd67Hm3", ModelStorage.Type.Removable));
+        list.add(new ModelStorage("Внутреннее хранилище", "context://internal_storage", ModelStorage.Type.Primary, null));
+        list.add(new ModelStorage("SD карта", "context://SD-card/hk78cJG435", ModelStorage.Type.Removable, null));
+        list.add(new ModelStorage("USB накопитель", "context://USB/hgTd67Hm3", ModelStorage.Type.Removable, null));
 
         return list;
     }

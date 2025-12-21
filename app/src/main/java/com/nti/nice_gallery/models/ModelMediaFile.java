@@ -1,5 +1,7 @@
 package com.nti.nice_gallery.models;
 
+import androidx.annotation.Nullable;
+
 import java.util.Date;
 
 public class ModelMediaFile {
@@ -32,6 +34,8 @@ public class ModelMediaFile {
 
     @ForVideosOnly public final Integer duration;
 
+    @Nullable public final Exception error;
+
     public ModelMediaFile(
             String name,
             String path,
@@ -43,7 +47,8 @@ public class ModelMediaFile {
             @ForFilesOnly Integer height,
             @ForFilesOnly Integer rotation,
             @ForFilesOnly String extension,
-            @ForVideosOnly Integer duration
+            @ForVideosOnly Integer duration,
+            @Nullable Exception error
     ) {
         this.name = name;
         this.path = path;
@@ -56,5 +61,6 @@ public class ModelMediaFile {
         this.rotation = rotation;
         this.extension = extension;
         this.duration = duration;
+        this.error = error;
     }
 }

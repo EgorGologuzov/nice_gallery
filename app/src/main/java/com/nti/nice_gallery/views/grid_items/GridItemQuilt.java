@@ -1,10 +1,13 @@
 package com.nti.nice_gallery.views.grid_items;
 
 import android.content.Context;
+import android.graphics.Bitmap;
+import android.util.Log;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import androidx.annotation.DrawableRes;
 import androidx.annotation.NonNull;
 
 import com.nti.nice_gallery.R;
@@ -16,6 +19,8 @@ import com.nti.nice_gallery.utils.Convert;
 import java.util.ArrayList;
 
 public class GridItemQuilt extends GridItemBase {
+
+    private static final String LOG_TAG = "GridItemQuilt";
 
     private ModelMediaFile model;
 
@@ -52,22 +57,45 @@ public class GridItemQuilt extends GridItemBase {
     }
 
     private void updateView() {
-        ArrayList<String> infoItems = new ArrayList<>();
+        String info = null;
+        Bitmap preview = null;
+        @DrawableRes Integer previewPlaceholder = R.drawable.baseline_error_24_orange_700;
 
-        if (model.type == ModelMediaFile.Type.Folder) {
-            infoItems.add(model.name);
-        } else if (model.type == ModelMediaFile.Type.Image) {
-            infoItems.add(model.extension.toUpperCase());
-            infoItems.add(convert.weightToString(model.weight));
-        } else if (model.type == ModelMediaFile.Type.Video) {
-            infoItems.add(getContext().getResources().getString(R.string.symbol_play_video));
-            infoItems.add(convert.durationToTimeString(model.duration));
-            infoItems.add(convert.weightToString(model.weight));
+        try {
+            ArrayList<String> infoItems = new ArrayList<>();
+
+            if (model.type == ModelMediaFile.Type.Folder) {
+                infoItems.add(model.name);
+            } else if (model.type == ModelMediaFile.Type.Image) {
+                infoItems.add(model.extension.toUpperCase());
+                infoItems.add(convert.weightToString(model.weight));
+            } else if (model.type == ModelMediaFile.Type.Video) {
+                infoItems.add(getContext().getResources().getString(R.string.symbol_play_video));
+                infoItems.add(convert.durationToTimeString(model.duration));
+                infoItems.add(convert.weightToString(model.weight));
+            }
+
+            info = String.join(getContext().getResources().getString(R.string.symbol_dot_separator), infoItems);
+
+            if (model.type == ModelMediaFile.Type.Folder) {
+                previewPlaceholder = R.drawable.baseline_folder_24_orange_700;
+            }
+
+            if (model.type != ModelMediaFile.Type.Folder) {
+                preview = managerOfFiles.getFilePreview(model);
+            }
+        } catch (Exception e) {
+            Log.e(LOG_TAG, e.getMessage());
+            if (info == null) { info = getContext().getResources().getString(R.string.message_error_load_file_info_failed); }
+            previewPlaceholder = R.drawable.baseline_error_24_orange_700;
         }
 
-        String infoString = String.join(getContext().getResources().getString(R.string.symbol_dot_separator), infoItems);
+        infoView.setText(info);
 
-        imageView.setImageBitmap(managerOfFiles.getFilePreview(model));
-        infoView.setText(infoString);
+        if (preview != null) {
+            imageView.setImageBitmap(preview);
+        } else if (previewPlaceholder != null) {
+            imageView.setImageResource(previewPlaceholder);
+        }
     }
 }

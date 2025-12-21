@@ -1,10 +1,13 @@
 package com.nti.nice_gallery.views.grid_items;
 
 import android.content.Context;
+import android.graphics.Bitmap;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.widget.ImageView;
 import android.widget.TextView;
 
+import androidx.annotation.DrawableRes;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
@@ -17,6 +20,8 @@ import com.nti.nice_gallery.utils.Convert;
 import java.util.ArrayList;
 
 public class GridItemLine extends GridItemBase {
+
+    private static final String LOG_TAG = "GridItemView";
 
     private ModelMediaFile model;
 
@@ -68,34 +73,62 @@ public class GridItemLine extends GridItemBase {
     }
 
     private void updateView() {
-        ArrayList<String> infoItems = new ArrayList<>();
+        String name = null;
+        String path = null;
+        String info = null;
+        String info2 = null;
+        Bitmap preview = null;
+        @DrawableRes Integer previewPlaceholder = R.drawable.baseline_error_24_orange_700;
+        int infoView2Visibility = GONE;
 
-        if (model.type != ModelMediaFile.Type.Folder) {
-            infoItems.add(convert.weightToString(model.weight));
-        }
+        try {
+            name = model.name;
+            path = model.path;
 
-        infoItems.add(convert.dateToFullNumericDateString(model.createdAt));
+            ArrayList<String> infoItems = new ArrayList<>();
 
-        if (model.width != null && model.width > 0 && model.height != null && model.height > 0) {
-            infoItems.add(convert.sizeToString(model.width, model.height));
-        }
+            if (model.type != ModelMediaFile.Type.Folder) {
+                infoItems.add(convert.weightToString(model.weight));
+                infoItems.add(convert.sizeToString(model.width, model.height));
+            }
 
-        String info = String.join(getContext().getResources().getString(R.string.symbol_dot_separator), infoItems);
-        infoItems.clear();
+            infoItems.add(convert.dateToFullNumericDateString(model.createdAt));
 
-        infoItems.add(getContext().getResources().getString(R.string.symbol_play_video));
-        infoItems.add(convert.durationToTimeString(model.duration));
+            info = String.join(getContext().getResources().getString(R.string.symbol_dot_separator), infoItems);
 
-        String info2 = String.join(getContext().getResources().getString(R.string.symbol_dot_separator), infoItems);
+            if (model.type == ModelMediaFile.Type.Video) {
+                infoItems.clear();
+                infoItems.add(getContext().getResources().getString(R.string.symbol_play_video));
+                infoItems.add(convert.durationToTimeString(model.duration));
+                info2 = String.join(getContext().getResources().getString(R.string.symbol_dot_separator), infoItems);
+                infoView2Visibility = VISIBLE;
+            }
 
-        if (model.type != ModelMediaFile.Type.Video) {
-            infoView2.setVisibility(GONE);
+            if (model.type == ModelMediaFile.Type.Folder) {
+                previewPlaceholder = R.drawable.baseline_folder_24_orange_700;
+            }
+
+            if (model.type != ModelMediaFile.Type.Folder) {
+                preview = managerOfFiles.getFilePreview(model);
+            }
+        } catch (Exception e) {
+            Log.e(LOG_TAG, e.getMessage());
+            if (info == null) { info = getContext().getResources().getString(R.string.message_error_load_file_info_failed); }
+            previewPlaceholder = R.drawable.baseline_error_24_orange_700;
         }
 
         imageView.setImageBitmap(managerOfFiles.getFilePreview(model));
-        nameView.setText(model.name);
-        pathView.setText(model.path);
+        nameView.setText(name);
+        pathView.setText(path);
         infoView.setText(info);
         infoView2.setText(info2);
+
+        if (preview != null) {
+            imageView.setImageBitmap(preview);
+        } else if (previewPlaceholder != null) {
+            imageView.setImageResource(previewPlaceholder);
+        }
+
+        infoView2.setVisibility(infoView2Visibility);
     }
 }

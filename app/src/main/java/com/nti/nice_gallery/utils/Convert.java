@@ -52,17 +52,18 @@ public class Convert {
         return String.format(context.getResources().getString(R.string.format_weight_terabytes), value);
     }
 
-    public String sizeToString(int width, int height) {
+    public String sizeToString(Integer width, Integer height) {
         return String.format(context.getResources().getString(R.string.format_size_2d), width, height);
     }
 
     public String dateToFullNumericDateString(Date date) {
+        if (date == null) return null;
         return new SimpleDateFormat(context.getResources().getString(R.string.format_java_simple_date_full_numeric)).format(date);
     }
 
     public String durationToTimeString(Integer duration) {
         if (duration == null) {
-            duration = 0;
+            return null;
         }
 
         int div = duration;
