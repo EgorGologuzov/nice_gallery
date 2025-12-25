@@ -1,11 +1,19 @@
 package com.nti.nice_gallery.data;
 
+import android.content.Context;
+
 import com.nti.nice_gallery.models.ModelFilters;
 import com.nti.nice_gallery.models.ModelScanList;
 
 import java.util.List;
 
 public class ManagerOfSettings_Test1 implements IManagerOfSettings{
+
+    private final Context context;
+
+    public ManagerOfSettings_Test1(Context context) {
+        this.context = context;
+    }
 
     private List<ModelScanList>  scanList;
     private ModelFilters filters;
