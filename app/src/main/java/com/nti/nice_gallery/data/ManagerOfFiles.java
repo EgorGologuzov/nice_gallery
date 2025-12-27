@@ -27,6 +27,7 @@ import java.io.FileFilter;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -60,6 +61,8 @@ public class ManagerOfFiles implements IManagerOfFiles {
             return files;
         };
 
+        final LocalDateTime startedAt = LocalDateTime.now();
+
         final List<ModelStorage> storages = getAllStorages();
         final List<ModelMediaFile> files = new ArrayList<>();
         final List<ModelStorage> storagesWithErrors = new ArrayList<>();
@@ -80,6 +83,8 @@ public class ManagerOfFiles implements IManagerOfFiles {
         }
 
         return new ModelGetFilesResponse(
+                startedAt,
+                LocalDateTime.now(),
                 new ReadOnlyList<>(files),
                 new ReadOnlyList<>(storages),
                 new ReadOnlyList<>(filesWithErrors),

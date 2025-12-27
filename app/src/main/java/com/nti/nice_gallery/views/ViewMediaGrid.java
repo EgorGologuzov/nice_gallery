@@ -2,14 +2,12 @@ package com.nti.nice_gallery.views;
 
 import android.content.Context;
 import android.util.AttributeSet;
-import android.util.Log;
 import android.util.Size;
 import android.view.View;
 import android.view.ViewTreeObserver;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 
-import androidx.annotation.DrawableRes;
 import androidx.annotation.Nullable;
 
 import com.nti.nice_gallery.R;
@@ -18,7 +16,6 @@ import com.nti.nice_gallery.data.IManagerOfSettings;
 import com.nti.nice_gallery.models.ModelMediaFile;
 import com.nti.nice_gallery.models.ReadOnlyList;
 import com.nti.nice_gallery.utils.Convert;
-import com.nti.nice_gallery.views.buttons.ButtonChoiceGridVariant;
 import com.nti.nice_gallery.views.grid_items.GridItemLine;
 import com.nti.nice_gallery.views.grid_items.GridItemQuilt;
 import com.nti.nice_gallery.views.grid_items.GridItemSquare;
@@ -35,17 +32,19 @@ public class ViewMediaGrid extends ScrollView {
     private static final String LOG_TAG = "ViewMediaGrid";
 
     public enum GridVariant { List, ThreeColumns, SixColumns, Quilt }
+    public enum State { ScanningInProgress, FilesLoading, StandbyMode }
 
     private LinearLayout container;
-    private ViewInfo viewInfo;
+    private ViewInfo viewInfoScanningInProgress;
+    private ViewInfo viewInfoFilesLoading;
+    private ViewInfo viewInfoNoItems;
 
     private ReadOnlyList<ModelMediaFile> items;
     private GridVariant gridVariant;
+    private int renderedItemsCount = 0;
+    private State state = State.StandbyMode;
 
     private IManagerOfSettings managerOfSettings;
-
-    private int renderedItemsCount = 0;
-    private boolean renderingInProgress = false;
 
     public ViewMediaGrid(Context context) {
         super(context);
@@ -78,10 +77,21 @@ public class ViewMediaGrid extends ScrollView {
         container.setPadding(containerPaddingPx, 0, containerPaddingPx, 0);
         addView(container);
 
-        viewInfo = new ViewInfo(getContext());
-        viewInfo.setIconVisibility(false);
-        viewInfo.setMessage(R.string.message_loading_in_progress);
-        viewInfo.setProgressBarVisibility(true);
+        viewInfoScanningInProgress = new ViewInfo(getContext());
+        viewInfoScanningInProgress.setIconVisibility(false);
+        viewInfoScanningInProgress.setMessage(R.string.message_scanning_in_progress);
+        viewInfoScanningInProgress.setProgressBarVisibility(true);
+
+        viewInfoFilesLoading = new ViewInfo(getContext());
+        viewInfoFilesLoading.setIconVisibility(false);
+        viewInfoFilesLoading.setMessage(R.string.message_loading_in_progress);
+        viewInfoFilesLoading.setProgressBarVisibility(true);
+
+        viewInfoNoItems = new ViewInfo(getContext());
+        viewInfoNoItems.setIcon(R.drawable.baseline_image_search_24);
+        viewInfoNoItems.setIconVisibility(true);
+        viewInfoNoItems.setMessage(R.string.message_no_items);
+        viewInfoNoItems.setProgressBarVisibility(false);
 
         updateGrid();
     }
@@ -104,27 +114,47 @@ public class ViewMediaGrid extends ScrollView {
         updateGrid();
     }
 
+    public State getState() {
+        return state;
+    }
+
+    public boolean trySetStateScanningInProgress(boolean isScanningInProgress) {
+        if (state == State.FilesLoading) {
+            return false;
+        }
+
+        if (isScanningInProgress) {
+            if (state != State.ScanningInProgress) {
+                state = State.ScanningInProgress;
+                updateGrid();
+            }
+        } else {
+            if (state != State.StandbyMode) {
+                state = State.StandbyMode;
+                updateGrid();
+            }
+        }
+
+        return true;
+    }
+
     private void updateGrid() {
+        if (state == State.ScanningInProgress) {
+            container.removeAllViews();
+            container.addView(viewInfoScanningInProgress);
+            return;
+        }
+
         if (items == null || items.isEmpty()) {
-            noItemsUpdate();
+            container.removeAllViews();
+            container.addView(viewInfoNoItems);
             return;
         }
 
         renderedItemsCount = 0;
-        renderingInProgress = false;
 
         container.removeAllViews();
         renderNextItems();
-    }
-
-    private void noItemsUpdate() {
-        container.removeAllViews();
-        ViewInfo info = new ViewInfo(getContext());
-        info.setIcon(R.drawable.baseline_image_search_24);
-        info.setIconVisibility(true);
-        info.setMessage(R.string.message_no_items);
-        info.setProgressBarVisibility(false);
-        container.addView(info);
     }
 
     private void onScrollChange(View v, int scrollX, int scrollY, int oldScrollX, int oldScrollY) {
@@ -140,12 +170,12 @@ public class ViewMediaGrid extends ScrollView {
     private void renderNextItems() {
         final int RENDERING_STEP_ITEMS_COUNT = 25;
 
-        if (this.renderingInProgress || this.renderedItemsCount == items.size()) {
+        if (state == State.FilesLoading || this.renderedItemsCount == items.size()) {
             return;
         }
 
-        this.renderingInProgress = true;
-        container.addView(viewInfo);
+        state = State.FilesLoading;
+        container.addView(viewInfoFilesLoading);
 
         Supplier<LinearLayout> renderNextForListVariant = () -> {
             int from = renderedItemsCount;
@@ -326,9 +356,9 @@ public class ViewMediaGrid extends ScrollView {
                 final LinearLayout pageContainerFinal = pageContainer;
 
                 post(() -> {
-                    container.removeView(viewInfo);
+                    container.removeView(viewInfoFilesLoading);
                     container.addView(pageContainerFinal);
-                    this.renderingInProgress = false;
+                    this.state = State.StandbyMode;
                     checkIsContainerFullAndLoadNextIfNot.run();
                     executor.shutdown();
                 });

@@ -13,7 +13,9 @@ import com.nti.nice_gallery.utils.ManagerOfNotifications;
 
 public class ButtonChoiceFilters extends ButtonBase {
 
-    private boolean areFiltersSet = false;
+//    private boolean areFiltersSet = false;
+
+    ManagerOfNavigation managerOfNavigation;
 
     public ButtonChoiceFilters(Context context) {
         super(context);
@@ -31,13 +33,12 @@ public class ButtonChoiceFilters extends ButtonBase {
     }
 
     private void init() {
+        managerOfNavigation = new ManagerOfNavigation(getContext());
         setImageResource(R.drawable.baseline_filter_alt_24);
         setOnClickListener(v -> onClick());
-
     }
 
     private void onClick() {
-        ManagerOfNavigation managerOfNavigation = new ManagerOfNavigation(getContext());
         managerOfNavigation.navigate((Activity)getContext(), ActivityFilters.class);
 
 //        areFiltersSet = !areFiltersSet;

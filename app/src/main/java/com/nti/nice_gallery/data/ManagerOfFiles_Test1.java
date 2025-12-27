@@ -14,6 +14,7 @@ import com.nti.nice_gallery.models.ModelMediaFile;
 import com.nti.nice_gallery.models.ModelStorage;
 import com.nti.nice_gallery.models.ReadOnlyList;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
@@ -195,6 +196,8 @@ public class ManagerOfFiles_Test1 implements IManagerOfFiles {
         }
 
         return new ModelGetFilesResponse(
+                LocalDateTime.now(),
+                LocalDateTime.now().plusSeconds(1),
                 new ReadOnlyList<>(items),
                 null,
                 null,

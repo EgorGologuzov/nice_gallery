@@ -32,8 +32,10 @@
 
 <!--Messages-->
     <string name="message_no_items">Нет ни одного элемента</string>
-    <string name="message_loading_in_progress">Загрузка…</string>
+    <string name="message_loading_in_progress">Загрузка файлов…</string>
+    <string name="message_scanning_in_progress">Сканирование…</string>
     <string name="message_request_manage_external_storage">Необходимо предоставить приложению доступ к файлам на вашем устройстве, без этого разрешения работа не возможна.\n\nДа - предоставить разрешение в настройках.\nНет - закрыть приложение.</string>
+    <string name="message_scanning_report_source_not_set">Не установлен источник данных</string>
     <!--Errors-->
     <string name="message_error_load_file_info_failed">Ошибка загрузки информации о файле</string>
 
