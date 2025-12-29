@@ -2,29 +2,29 @@ package com.nti.nice_gallery.views.buttons;
 
 import android.content.Context;
 import android.util.AttributeSet;
+
+import androidx.annotation.DrawableRes;
+
 import com.nti.nice_gallery.R;
+import com.nti.nice_gallery.data.Domain;
+import com.nti.nice_gallery.data.IManagerOfSettings;
+import com.nti.nice_gallery.models.ReadOnlyList;
 import com.nti.nice_gallery.views.ViewMediaGrid;
 
 import java.util.function.Consumer;
 
 public class ButtonChoiceGridVariant extends ButtonBase {
 
-    private final ViewMediaGrid.GridVariant[] variants = new ViewMediaGrid.GridVariant[] {
-            ViewMediaGrid.GridVariant.List,
-            ViewMediaGrid.GridVariant.ThreeColumns,
-            ViewMediaGrid.GridVariant.SixColumns,
-            ViewMediaGrid.GridVariant.Quilt
-    };
+    private static final ReadOnlyList<VariantInfo> variants = new ReadOnlyList<>(new VariantInfo[] {
+            new VariantInfo(ViewMediaGrid.GridVariant.List, R.drawable.baseline_view_list_24),
+            new VariantInfo(ViewMediaGrid.GridVariant.ThreeColumns, R.drawable.baseline_view_module_24),
+            new VariantInfo(ViewMediaGrid.GridVariant.SixColumns, R.drawable.baseline_view_compact_24),
+            new VariantInfo(ViewMediaGrid.GridVariant.Quilt, R.drawable.baseline_view_quilt_24),
+    });
 
-    private final int[] icons = new int[] {
-            R.drawable.baseline_view_list_24,
-            R.drawable.baseline_view_module_24,
-            R.drawable.baseline_view_compact_24,
-            R.drawable.baseline_view_quilt_24
-    };
-
-    private int selectedVariant = 1;
-    private Consumer<ViewMediaGrid.GridVariant> variantChangeListener;
+    private int selectedVariantIndex;
+    private Consumer<ButtonChoiceGridVariant> variantChangeListener;
+    private IManagerOfSettings managerOfSettings;
 
     public ButtonChoiceGridVariant(Context context) {
         super(context);
@@ -42,25 +42,46 @@ public class ButtonChoiceGridVariant extends ButtonBase {
     }
 
     private void init() {
-        setImageResource(icons[selectedVariant]);
+        managerOfSettings = Domain.getManagerOfSettings(getContext());
+        ViewMediaGrid.GridVariant currentGridVariant = managerOfSettings.getGridVariant();
+        VariantInfo selectedVariantInfo = variants.stream().filter(vi -> vi.variant == currentGridVariant).findFirst().get();
+        selectedVariantIndex = variants.indexOf(selectedVariantInfo);
+        setImageResource(selectedVariantInfo.iconResourceId);
         setOnClickListener(v -> onClick());
     }
 
-    public void setVariantChangeListener(Consumer<ViewMediaGrid.GridVariant> l) {
+    public ViewMediaGrid.GridVariant getSelectedVariant() {
+        return variants.get(selectedVariantIndex).variant;
+    }
+
+    public void setVariantChangeListener(Consumer<ButtonChoiceGridVariant> l) {
         variantChangeListener = l;
     }
 
     private void onClick() {
-        selectedVariant++;
+        selectedVariantIndex++;
 
-        if (selectedVariant > 3) {
-            selectedVariant = 0;
+        if (selectedVariantIndex >= variants.size()) {
+            selectedVariantIndex = 0;
         }
 
-        setImageResource(icons[selectedVariant]);
+        setImageResource(variants.get(selectedVariantIndex).iconResourceId);
 
         if (variantChangeListener != null) {
-            variantChangeListener.accept(variants[selectedVariant]);
+            variantChangeListener.accept(this);
+        }
+    }
+
+    private static class VariantInfo {
+        public final ViewMediaGrid.GridVariant variant;
+        @DrawableRes public final int iconResourceId;
+
+        public VariantInfo(
+                ViewMediaGrid.GridVariant variant,
+                @DrawableRes int iconResourceId
+        ) {
+            this.variant = variant;
+            this.iconResourceId = iconResourceId;
         }
     }
 }

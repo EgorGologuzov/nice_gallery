@@ -17,6 +17,8 @@
     <!--Duration-->
     <string name="format_duration_short">%d:%02d</string>
     <string name="format_duration_full">%d:%02d:%02d</string>
+    <!--Names-->
+    <string name="format_name_storage_name">%s [%s]</string>
 
 <!--Symbols-->
     <string name="symbol_dot_separator">" • "</string>
@@ -30,5 +32,18 @@
 
 <!--Messages-->
     <string name="message_no_items">Нет ни одного элемента</string>
-    <string name="message_update_in_progress">Обновление…</string>
+    <string name="message_loading_in_progress">Загрузка файлов…</string>
+    <string name="message_scanning_in_progress">Сканирование…</string>
+    <string name="message_request_manage_external_storage">Необходимо предоставить приложению доступ к файлам на вашем устройстве, без этого разрешения работа не возможна.\n\nДа - предоставить разрешение в настройках.\nНет - закрыть приложение.</string>
+    <string name="message_scanning_report_source_not_set">Не установлен источник данных</string>
+    <!--Errors-->
+    <string name="message_error_load_file_info_failed">Ошибка загрузки информации о файле</string>
+
+<!--Dialogs-->
+    <string name="dialog_title_permission_required">Необходимо разрешение</string>
+    <string name="dialog_title_scanning_report">Отчет о сканировании</string>
+    <string name="dialog_button_ok">ОК</string>
+    <string name="dialog_button_yes">Да</string>
+    <string name="dialog_button_no">Нет</string>
+
 </resources>

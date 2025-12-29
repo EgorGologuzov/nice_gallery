@@ -8,10 +8,15 @@ import android.util.Size;
 import androidx.core.content.ContextCompat;
 
 import com.nti.nice_gallery.R;
-import com.nti.nice_gallery.models.ModelMediaTreeItem;
+import com.nti.nice_gallery.models.ModelGetFilesRequest;
+import com.nti.nice_gallery.models.ModelGetFilesResponse;
+import com.nti.nice_gallery.models.ModelMediaFile;
 import com.nti.nice_gallery.models.ModelStorage;
+import com.nti.nice_gallery.models.ReadOnlyList;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
@@ -24,15 +29,29 @@ import kotlin.jvm.functions.Function3;
 // Менеджер файлов для теста интерфейса
 public class ManagerOfFiles_Test1 implements IManagerOfFiles {
 
+    private static Bitmap placeholder_960x960;
+    private static Bitmap placeholder_1920x1080;
+    private static Bitmap placeholder_1080x1920;
+
     private final Context context;
 
     public ManagerOfFiles_Test1(Context context) {
         this.context = context;
+
+        if (placeholder_960x960 == null) {
+            placeholder_960x960 = ((BitmapDrawable)(ContextCompat.getDrawable(context, R.drawable.placeholder_960x960))).getBitmap();
+        }
+        if (placeholder_1920x1080 == null) {
+            placeholder_1920x1080 = ((BitmapDrawable)(ContextCompat.getDrawable(context, R.drawable.placeholder_1920x1080))).getBitmap();
+        }
+        if (placeholder_1080x1920 == null) {
+            placeholder_1080x1920 = ((BitmapDrawable)(ContextCompat.getDrawable(context, R.drawable.placeholder_1080x1920))).getBitmap();
+        }
     }
 
     // Возвращает спсиок случайно сгенерированных файлов
     @Override
-    public List<ModelMediaTreeItem> getAllFiles() {
+    public ModelGetFilesResponse getFiles(ModelGetFilesRequest _) {
 
         final int RANDOM_SEED = 42;
         final int ITEMS_COUNT = 100;
@@ -47,18 +66,15 @@ public class ManagerOfFiles_Test1 implements IManagerOfFiles {
         final int SHARE_OF_1920x1080_FILES = 50;
         final int SHARE_OF_1080x1920_FILES = 50;
 
-        List<ModelMediaTreeItem> items = new ArrayList<>();
+        List<ModelMediaFile> items = new ArrayList<>();
         Random random = new Random(RANDOM_SEED);
 
-        Supplier<Date> randomDate = () -> {
-            Calendar cal = Calendar.getInstance();
-            cal.add(Calendar.DAY_OF_YEAR, -random.nextInt(MAX_NUMBER_OF_DAYS_AGO));
-            cal.add(Calendar.HOUR_OF_DAY, -random.nextInt(24));
-            cal.add(Calendar.MINUTE, -random.nextInt(60));
-            return cal.getTime();
+        Supplier<LocalDateTime> randomDate = () -> {
+            int randomInt = random.nextInt(MAX_NUMBER_OF_DAYS_AGO);
+            return LocalDateTime.now().minusDays(randomInt);
         };
 
-        Supplier<ModelMediaTreeItem.Type> randomType = () -> {
+        Supplier<ModelMediaFile.Type> randomType = () -> {
             float randomFloat = random.nextFloat();
             int sumShare = SHARE_OF_IMAGES + SHARE_OF_VIDEOS + SHARE_OF_FOLDERS;
             float imagesPercent = (float)SHARE_OF_IMAGES / (float)sumShare;
@@ -67,50 +83,60 @@ public class ManagerOfFiles_Test1 implements IManagerOfFiles {
 
             float currentPercent = imagesPercent;
             if (randomFloat <= currentPercent) {
-                return ModelMediaTreeItem.Type.Image;
+                return ModelMediaFile.Type.Image;
             }
 
             currentPercent += videosPercent;
             if (randomFloat <= currentPercent) {
-                return ModelMediaTreeItem.Type.Video;
+                return ModelMediaFile.Type.Video;
             }
 
-            return ModelMediaTreeItem.Type.Folder;
+            return ModelMediaFile.Type.Folder;
         };
 
-        Function1<ModelMediaTreeItem.Type, String> randomExtension = (type) -> {
-            if (type == ModelMediaTreeItem.Type.Folder) {
+        Function1<ModelMediaFile.Type, String> randomExtension = (type) -> {
+            if (type == ModelMediaFile.Type.Folder) {
                 return null;
             }
 
-            if (type == ModelMediaTreeItem.Type.Image) {
-                return ModelMediaTreeItem.supportedImageExtensions[random.nextInt(ModelMediaTreeItem.supportedImageExtensions.length)];
+            String[] imageExtensions = Arrays.stream(ModelMediaFile.supportedMediaFormats)
+                    .filter(f -> f.type == ModelMediaFile.Type.Image)
+                    .map(f -> f.fileExtension)
+                    .toArray(String[]::new);
+
+            String[] videoExtensions = Arrays.stream(ModelMediaFile.supportedMediaFormats)
+                    .filter(f -> f.type == ModelMediaFile.Type.Video)
+                    .map(f -> f.fileExtension)
+                    .toArray(String[]::new);
+
+            if (type == ModelMediaFile.Type.Image) {
+                return imageExtensions[random.nextInt(imageExtensions.length)];
             }
 
-            return ModelMediaTreeItem.supportedVideoExtensions[random.nextInt(ModelMediaTreeItem.supportedVideoExtensions.length)];
+            return videoExtensions[random.nextInt(videoExtensions.length)];
         };
 
-        Function3<ModelMediaTreeItem.Type, Integer, String, String> randomName = (type, i, extension) -> {
-            return type == ModelMediaTreeItem.Type.Folder ? "folder_" + i : "file_" + i + "." + extension;
+        Function3<ModelMediaFile.Type, Integer, String, String> randomName = (type, i, extension) -> {
+            return type == ModelMediaFile.Type.Folder ? "folder_" + i : "file_" + i + "." + extension;
         };
 
         Function1<String, String> randomPath = (fileName) -> {
             return "internal_storage/DCIM/" + fileName;
         };
 
-        Function1<ModelMediaTreeItem.Type, Long> randomWeight = (type) -> {
-            if (type == ModelMediaTreeItem.Type.Image) {
+        Function1<ModelMediaFile.Type, Long> randomWeight = (type) -> {
+            if (type == ModelMediaFile.Type.Image) {
                 return (long)random.nextInt(MAX_IMAGE_WEIGHT);
             }
-            if (type == ModelMediaTreeItem.Type.Video) {
+            if (type == ModelMediaFile.Type.Video) {
                 return (long)random.nextInt(MAX_VIDEO_WEIGHT);
             }
 
             return (long)random.nextInt(MAX_FOLDER_WEIGHT);
         };
 
-        Function1<ModelMediaTreeItem.Type, Size> randomSize = (type) -> {
-            if (type == ModelMediaTreeItem.Type.Folder) {
+        Function1<ModelMediaFile.Type, Size> randomSize = (type) -> {
+            if (type == ModelMediaFile.Type.Folder) {
                 return null;
             }
 
@@ -127,37 +153,63 @@ public class ManagerOfFiles_Test1 implements IManagerOfFiles {
             return new Size(1080, 1920);
         };
 
-        Function1<ModelMediaTreeItem.Type, Integer> randomDuration = (type) -> {
-            return type == ModelMediaTreeItem.Type.Video ? random.nextInt(MAX_VIDEO_DURATION) : null;
+        Function1<ModelMediaFile.Type, Integer> randomDuration = (type) -> {
+            return type == ModelMediaFile.Type.Video ? random.nextInt(MAX_VIDEO_DURATION) : null;
         };
 
         for (int i = 0; i < ITEMS_COUNT; i++) {
 
-            ModelMediaTreeItem.Type type = randomType.get();
+            ModelMediaFile.Type type = randomType.get();
             String extension = randomExtension.invoke(type);
             String name = randomName.invoke(type, i, extension);
             String path = randomPath.invoke(name);
             Long weight = randomWeight.invoke(type);
-            Date createdAt = randomDate.get();
-            Date updatedAt = randomDate.get();
+            LocalDateTime createdAt = randomDate.get();
+            LocalDateTime updatedAt = randomDate.get();
             Size resolution = randomSize.invoke(type);
             Integer duration = randomDuration.invoke(type);
 
-            items.add(new ModelMediaTreeItem(name, path, type, weight, createdAt, updatedAt, resolution, extension, duration));
+            int width = -1, height = -1, rotation = 0;
+
+            if (resolution != null) {
+                width = resolution.getWidth();
+                height = resolution.getHeight();
+            }
+
+            items.add(new ModelMediaFile(
+                    name,
+                    path,
+                    type,
+                    createdAt,
+                    updatedAt,
+                    weight,
+                    width,
+                    height,
+                    rotation,
+                    extension,
+                    duration,
+                    null
+            ));
         }
 
-        return items;
+        return new ModelGetFilesResponse(
+                LocalDateTime.now(),
+                LocalDateTime.now().plusSeconds(1),
+                new ReadOnlyList<>(items),
+                null,
+                null,
+                null
+        );
     }
 
-    // Возвращает заглушку соответсвующего размера
     @Override
-    public Bitmap getItemPreviewAsBitmap(ModelMediaTreeItem item) {
-        if (item.resolution == null) {
-            return ((BitmapDrawable)(ContextCompat.getDrawable(context, R.drawable.placeholder_960x960))).getBitmap();
-        } else if (item.resolution.getWidth() == 1920) {
-            return ((BitmapDrawable)(ContextCompat.getDrawable(context, R.drawable.placeholder_1920x1080))).getBitmap();
+    public Bitmap getFilePreview(ModelMediaFile item) {
+        if (item.width == null || item.width <= 0) {
+            return placeholder_960x960;
+        } else if (item.width == 1920) {
+            return placeholder_1920x1080;
         } else {
-            return ((BitmapDrawable)(ContextCompat.getDrawable(context, R.drawable.placeholder_1080x1920))).getBitmap();
+            return placeholder_1080x1920;
         }
     }
 
@@ -166,9 +218,9 @@ public class ManagerOfFiles_Test1 implements IManagerOfFiles {
     public List<ModelStorage> getAllStorages() {
         List<ModelStorage> list = new ArrayList<>();
 
-        list.add(new ModelStorage("Внутреннее хранилище"));
-        list.add(new ModelStorage("SD карта"));
-        list.add(new ModelStorage("USB накопитель"));
+        list.add(new ModelStorage("Внутреннее хранилище", "context://internal_storage", ModelStorage.Type.Primary, null));
+        list.add(new ModelStorage("SD карта", "context://SD-card/hk78cJG435", ModelStorage.Type.Removable, null));
+        list.add(new ModelStorage("USB накопитель", "context://USB/hgTd67Hm3", ModelStorage.Type.Removable, null));
 
         return list;
     }

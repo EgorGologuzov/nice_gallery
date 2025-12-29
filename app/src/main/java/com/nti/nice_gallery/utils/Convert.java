@@ -3,13 +3,11 @@ package com.nti.nice_gallery.utils;
 import android.content.Context;
 import android.util.Size;
 
-import androidx.annotation.Nullable;
-
 import com.nti.nice_gallery.R;
-import com.nti.nice_gallery.models.ModelMediaTreeItem;
 
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Date;
 
 public class Convert {
@@ -56,17 +54,19 @@ public class Convert {
         return String.format(context.getResources().getString(R.string.format_weight_terabytes), value);
     }
 
-    public String sizeToString(Size size) {
-        return String.format(context.getResources().getString(R.string.format_size_2d), size.getWidth(), size.getHeight());
+    public String sizeToString(Integer width, Integer height) {
+        return String.format(context.getResources().getString(R.string.format_size_2d), width, height);
     }
 
-    public String dateToFullNumericDateString(Date date) {
-        return new SimpleDateFormat(context.getResources().getString(R.string.format_java_simple_date_full_numeric)).format(date);
+    public String dateToFullNumericDateString(LocalDateTime date) {
+        if (date == null) return null;
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern(context.getString(R.string.format_java_simple_date_full_numeric));
+        return date.format(formatter);
     }
 
     public String durationToTimeString(Integer duration) {
         if (duration == null) {
-            duration = 0;
+            return null;
         }
 
         int div = duration;

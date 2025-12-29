@@ -4,6 +4,7 @@ import android.content.Context;
 
 import com.nti.nice_gallery.models.ModelFilters;
 import com.nti.nice_gallery.models.ModelScanList;
+import com.nti.nice_gallery.views.ViewMediaGrid;
 
 import java.util.Collections;
 import java.util.List;
@@ -33,6 +34,16 @@ public class ManagerOfSettings implements IManagerOfSettings {
 
     @Override
     public void saveFilters(ModelFilters filters) {
+
+    }
+
+    @Override
+    public ViewMediaGrid.GridVariant getGridVariant() {
+        return null;
+    }
+
+    @Override
+    public void saveGridVariant(ViewMediaGrid.GridVariant variant) {
 
     }
 }

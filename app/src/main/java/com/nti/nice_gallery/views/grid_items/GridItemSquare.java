@@ -1,25 +1,30 @@
 package com.nti.nice_gallery.views.grid_items;
 
 import android.content.Context;
+import android.graphics.Bitmap;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import androidx.annotation.DrawableRes;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.nti.nice_gallery.R;
+import com.nti.nice_gallery.data.Domain;
 import com.nti.nice_gallery.data.IManagerOfFiles;
-import com.nti.nice_gallery.data.ManagerOfFiles_Test1;
-import com.nti.nice_gallery.models.ModelMediaTreeItem;
+import com.nti.nice_gallery.models.ModelMediaFile;
 import com.nti.nice_gallery.utils.Convert;
 
 import java.util.ArrayList;
 
 public class GridItemSquare extends GridItemBase {
 
-    private ModelMediaTreeItem model;
+    private static final String LOG_TAG = "GridItemSquare";
+
+    private ModelMediaFile model;
     private boolean isInfoHidden;
 
     private TextView infoView;
@@ -56,15 +61,15 @@ public class GridItemSquare extends GridItemBase {
 
         infoView = findViewById(R.id.infoView);
         imageView = findViewById(R.id.imageView);
-        managerOfFiles = new ManagerOfFiles_Test1(getContext());
+        managerOfFiles = Domain.getManagerOfFiles(getContext());
         convert = new Convert(getContext());
     }
 
-    public ModelMediaTreeItem getModel() {
+    public ModelMediaFile getModel() {
         return model;
     }
 
-    public void setModel(ModelMediaTreeItem model) {
+    public void setModel(ModelMediaFile model) {
         this.model = model;
         updateView();
     }
@@ -75,36 +80,57 @@ public class GridItemSquare extends GridItemBase {
 
     public void setIsInfoHidden(boolean isInfoHidden) {
         this.isInfoHidden = isInfoHidden;
-        updateView();
     }
 
     private void updateView() {
-        ArrayList<String> infoItems = new ArrayList<>();
+        String info = null;
+        Bitmap preview = null;
+        @DrawableRes Integer previewPlaceholder = R.drawable.baseline_error_24_orange_700;
 
-        if (model.type == ModelMediaTreeItem.Type.Folder) {
-            infoItems.add(model.name);
-            infoItems.add(convert.weightToString(model.weight));
-        } else if (model.type == ModelMediaTreeItem.Type.Image) {
-            infoItems.add(model.extension.toUpperCase());
-            infoItems.add(convert.weightToString(model.weight));
-        } else if (model.type == ModelMediaTreeItem.Type.Video) {
-            infoItems.add(getContext().getResources().getString(R.string.symbol_play_video));
-            infoItems.add(convert.durationToTimeString(model.duration));
-            infoItems.add(convert.weightToString(model.weight));
-        }
+        try {
+            ArrayList<String> infoItems = new ArrayList<>();
 
-        if (isInfoHidden) {
-            if (model.type == ModelMediaTreeItem.Type.Video) {
-                infoItems.clear();
+            if (model.type == ModelMediaFile.Type.Folder) {
+                infoItems.add(model.name);
+            } else if (model.type == ModelMediaFile.Type.Image) {
+                infoItems.add(model.extension.toUpperCase());
+                infoItems.add(convert.weightToString(model.weight));
+            } else if (model.type == ModelMediaFile.Type.Video) {
                 infoItems.add(getContext().getResources().getString(R.string.symbol_play_video));
-            } else {
-                infoView.setVisibility(GONE);
+                infoItems.add(convert.durationToTimeString(model.duration));
+                infoItems.add(convert.weightToString(model.weight));
             }
+
+            if (isInfoHidden) {
+                if (model.type == ModelMediaFile.Type.Video) {
+                    infoItems.clear();
+                    infoItems.add(getContext().getResources().getString(R.string.symbol_play_video));
+                } else {
+                    infoView.setVisibility(GONE);
+                }
+            }
+
+            info = String.join(getContext().getResources().getString(R.string.symbol_dot_separator), infoItems);
+
+            if (model.type == ModelMediaFile.Type.Folder) {
+                previewPlaceholder = R.drawable.baseline_folder_24_orange_700;
+            }
+
+            if (model.type != ModelMediaFile.Type.Folder) {
+                preview = managerOfFiles.getFilePreview(model);
+            }
+        } catch (Exception e) {
+            Log.e(LOG_TAG, e.getMessage());
+            if (info == null) { info = getContext().getResources().getString(R.string.message_error_load_file_info_failed); }
+            previewPlaceholder = R.drawable.baseline_error_24_orange_700;
         }
 
-        String infoString = String.join(getContext().getResources().getString(R.string.symbol_dot_separator), infoItems);
+        infoView.setText(info);
 
-        imageView.setImageBitmap(managerOfFiles.getItemPreviewAsBitmap(model));
-        infoView.setText(infoString);
+        if (preview != null) {
+            imageView.setImageBitmap(preview);
+        } else if (previewPlaceholder != null) {
+            imageView.setImageResource(previewPlaceholder);
+        }
     }
 }

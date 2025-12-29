@@ -6,6 +6,7 @@
     android:orientation="vertical">
 
     <com.nti.nice_gallery.views.ViewActionBar
+        android:id="@+id/viewActionBar"
         style="@style/Custom_ActionBar">
         <com.nti.nice_gallery.views.buttons.ButtonChoiceGridVariant
             android:id="@+id/buttonGridVariant"
@@ -15,6 +16,12 @@
             style="@style/Custom_ActionBar_Button" />
         <com.nti.nice_gallery.views.buttons.ButtonChoiceFilters
             android:id="@+id/buttonFilters"
+            style="@style/Custom_ActionBar_Button" />
+        <com.nti.nice_gallery.views.buttons.ButtonRefresh
+            android:id="@+id/buttonRefresh"
+            style="@style/Custom_ActionBar_Button" />
+        <com.nti.nice_gallery.views.buttons.ButtonScanningReport
+            android:id="@+id/buttonScanningReport"
             style="@style/Custom_ActionBar_Button" />
     </com.nti.nice_gallery.views.ViewActionBar>
 

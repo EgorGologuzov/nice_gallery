@@ -2,13 +2,15 @@ package com.nti.nice_gallery.data;
 
 import android.graphics.Bitmap;
 
-import com.nti.nice_gallery.models.ModelMediaTreeItem;
+import com.nti.nice_gallery.models.ModelGetFilesRequest;
+import com.nti.nice_gallery.models.ModelGetFilesResponse;
+import com.nti.nice_gallery.models.ModelMediaFile;
 import com.nti.nice_gallery.models.ModelStorage;
 
 import java.util.List;
 
 public interface IManagerOfFiles {
-    List<ModelMediaTreeItem> getAllFiles();
-    Bitmap getItemPreviewAsBitmap(ModelMediaTreeItem item);
+    ModelGetFilesResponse getFiles(ModelGetFilesRequest request);
+    Bitmap getFilePreview(ModelMediaFile item);
     List<ModelStorage> getAllStorages();
 }
