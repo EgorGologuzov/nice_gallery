@@ -15,6 +15,7 @@ import androidx.annotation.Nullable;
 import com.nti.nice_gallery.R;
 import com.nti.nice_gallery.data.Domain;
 import com.nti.nice_gallery.data.IManagerOfFiles;
+import com.nti.nice_gallery.models.ModelGetPreviewRequest;
 import com.nti.nice_gallery.models.ModelMediaFile;
 import com.nti.nice_gallery.utils.Convert;
 
@@ -84,8 +85,6 @@ public class GridItemSquare extends GridItemBase {
 
     private void updateView() {
         String info = null;
-        Bitmap preview = null;
-        @DrawableRes Integer previewPlaceholder = R.drawable.baseline_error_24_orange_700;
 
         try {
             ArrayList<String> infoItems = new ArrayList<>();
@@ -111,26 +110,31 @@ public class GridItemSquare extends GridItemBase {
             }
 
             info = String.join(getContext().getResources().getString(R.string.symbol_dot_separator), infoItems);
-
-            if (model.type == ModelMediaFile.Type.Folder) {
-                previewPlaceholder = R.drawable.baseline_folder_24_orange_700;
-            }
-
-            if (model.type != ModelMediaFile.Type.Folder) {
-                preview = managerOfFiles.getFilePreview(model);
-            }
         } catch (Exception e) {
             Log.e(LOG_TAG, e.getMessage());
             if (info == null) { info = getContext().getResources().getString(R.string.message_error_load_file_info_failed); }
-            previewPlaceholder = R.drawable.baseline_error_24_orange_700;
         }
 
         infoView.setText(info);
 
-        if (preview != null) {
-            imageView.setImageBitmap(preview);
-        } else if (previewPlaceholder != null) {
-            imageView.setImageResource(previewPlaceholder);
+        try {
+            if (model.type != ModelMediaFile.Type.Folder) {
+                ModelGetPreviewRequest previewRequest = new ModelGetPreviewRequest(
+                        model
+                );
+
+                managerOfFiles.getPreviewAsync(previewRequest, response -> {
+                    if (response != null && response.preview != null) {
+                        post(() -> imageView.setImageBitmap(response.preview));
+                    } else {
+                        post(() -> imageView.setImageResource(R.drawable.baseline_error_24_orange_700));
+                    }
+                });
+            } else {
+                imageView.setImageResource(R.drawable.baseline_folder_24_orange_700);
+            }
+        } catch (Exception e) {
+            imageView.setImageResource(R.drawable.baseline_error_24_orange_700);
         }
     }
 }

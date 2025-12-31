@@ -10,17 +10,21 @@ import androidx.core.content.ContextCompat;
 import com.nti.nice_gallery.R;
 import com.nti.nice_gallery.models.ModelGetFilesRequest;
 import com.nti.nice_gallery.models.ModelGetFilesResponse;
+import com.nti.nice_gallery.models.ModelGetPreviewRequest;
+import com.nti.nice_gallery.models.ModelGetPreviewResponse;
+import com.nti.nice_gallery.models.ModelGetStoragesRequest;
+import com.nti.nice_gallery.models.ModelGetStoragesResponse;
 import com.nti.nice_gallery.models.ModelMediaFile;
 import com.nti.nice_gallery.models.ModelStorage;
-import com.nti.nice_gallery.models.ReadOnlyList;
+import com.nti.nice_gallery.utils.ManagerOfThreads;
+import com.nti.nice_gallery.utils.ReadOnlyList;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Calendar;
-import java.util.Date;
 import java.util.List;
 import java.util.Random;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 import kotlin.jvm.functions.Function1;
@@ -34,9 +38,11 @@ public class ManagerOfFiles_Test1 implements IManagerOfFiles {
     private static Bitmap placeholder_1080x1920;
 
     private final Context context;
+    private final ManagerOfThreads managerOfThreads;
 
     public ManagerOfFiles_Test1(Context context) {
         this.context = context;
+        this.managerOfThreads = new ManagerOfThreads(context);
 
         if (placeholder_960x960 == null) {
             placeholder_960x960 = ((BitmapDrawable)(ContextCompat.getDrawable(context, R.drawable.placeholder_960x960))).getBitmap();
@@ -51,7 +57,7 @@ public class ManagerOfFiles_Test1 implements IManagerOfFiles {
 
     // Возвращает спсиок случайно сгенерированных файлов
     @Override
-    public ModelGetFilesResponse getFiles(ModelGetFilesRequest _) {
+    public void getFilesAsync(ModelGetFilesRequest request, Consumer<ModelGetFilesResponse> callback) {
 
         final int RANDOM_SEED = 42;
         final int ITEMS_COUNT = 100;
@@ -192,7 +198,7 @@ public class ManagerOfFiles_Test1 implements IManagerOfFiles {
             ));
         }
 
-        return new ModelGetFilesResponse(
+        ModelGetFilesResponse response = new ModelGetFilesResponse(
                 LocalDateTime.now(),
                 LocalDateTime.now().plusSeconds(1),
                 new ReadOnlyList<>(items),
@@ -200,28 +206,47 @@ public class ManagerOfFiles_Test1 implements IManagerOfFiles {
                 null,
                 null
         );
+
+        managerOfThreads.safeAccept(callback, response);
     }
 
     @Override
-    public Bitmap getFilePreview(ModelMediaFile item) {
-        if (item.width == null || item.width <= 0) {
-            return placeholder_960x960;
-        } else if (item.width == 1920) {
-            return placeholder_1920x1080;
-        } else {
-            return placeholder_1080x1920;
+    public void getPreviewAsync(ModelGetPreviewRequest request, Consumer<ModelGetPreviewResponse> callback) {
+        if (request == null) {
+            managerOfThreads.safeAccept(callback, new ModelGetPreviewResponse(null));
+            return;
         }
+
+        Bitmap bitmap = null;
+
+        if (request.file.width == null || request.file.width <= 0) {
+            bitmap = placeholder_960x960;
+        } else if (request.file.width == 1920) {
+            bitmap =  placeholder_1920x1080;
+        } else {
+            bitmap =  placeholder_1080x1920;
+        }
+
+        ModelGetPreviewResponse response = new ModelGetPreviewResponse(
+                bitmap
+        );
+
+        managerOfThreads.safeAccept(callback, response);
     }
 
     // Возращает примерный список хранилищ
     @Override
-    public List<ModelStorage> getAllStorages() {
-        List<ModelStorage> list = new ArrayList<>();
+    public void getStoragesAsync(ModelGetStoragesRequest request, Consumer<ModelGetStoragesResponse> callback) {
+        List<ModelStorage> storages = new ArrayList<>();
 
-        list.add(new ModelStorage("Внутреннее хранилище", "context://internal_storage", ModelStorage.Type.Primary, null));
-        list.add(new ModelStorage("SD карта", "context://SD-card/hk78cJG435", ModelStorage.Type.Removable, null));
-        list.add(new ModelStorage("USB накопитель", "context://USB/hgTd67Hm3", ModelStorage.Type.Removable, null));
+        storages.add(new ModelStorage("Внутреннее хранилище", "context://internal_storage", ModelStorage.Type.Primary, null));
+        storages.add(new ModelStorage("SD карта", "context://SD-card/hk78cJG435", ModelStorage.Type.Removable, null));
+        storages.add(new ModelStorage("USB накопитель", "context://USB/hgTd67Hm3", ModelStorage.Type.Removable, null));
 
-        return list;
+        ModelGetStoragesResponse response = new ModelGetStoragesResponse(
+                new ReadOnlyList<>(storages)
+        );
+
+        managerOfThreads.safeAccept(callback, response);
     }
 }

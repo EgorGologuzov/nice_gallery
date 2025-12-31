@@ -16,8 +16,9 @@ import com.nti.nice_gallery.data.IManagerOfFiles;
 import com.nti.nice_gallery.models.ModelFilters;
 import com.nti.nice_gallery.models.ModelGetFilesRequest;
 import com.nti.nice_gallery.models.ModelGetFilesResponse;
+import com.nti.nice_gallery.models.ModelGetPreviewRequest;
 import com.nti.nice_gallery.models.ModelMediaFile;
-import com.nti.nice_gallery.models.ReadOnlyList;
+import com.nti.nice_gallery.utils.ReadOnlyList;
 import com.nti.nice_gallery.views.ViewActionBar;
 import com.nti.nice_gallery.views.ViewMediaGrid;
 import com.nti.nice_gallery.views.buttons.ButtonChoiceFilters;
@@ -31,8 +32,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.function.Supplier;
 
 public class FragmentMediaAll extends Fragment {
+
+    private IManagerOfFiles managerOfFiles;
+
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_media_all, container, false);
@@ -45,8 +50,9 @@ public class FragmentMediaAll extends Fragment {
         ButtonRefresh buttonRefresh = view.findViewById(R.id.buttonRefresh);
         ButtonScanningReport buttonScanningReport = view.findViewById(R.id.buttonScanningReport);
 
-        Runnable loadFiles = () -> {
+        managerOfFiles = Domain.getManagerOfFiles(getContext());
 
+        Supplier<ModelGetFilesRequest> getTestRequest = () -> {
 //            ModelGetFilesRequest.SortVariant sortVariant = null;
             ModelGetFilesRequest.SortVariant sortVariant = ModelGetFilesRequest.SortVariant.ByCreateAtDesc;
             boolean foldersFirst = true;
@@ -96,22 +102,25 @@ public class FragmentMediaAll extends Fragment {
                     maxDuration
             );
 
-            viewMediaGrid.trySetStateScanningInProgress(true);
+            return new ModelGetFilesRequest(
+                    filters,
+                    sortVariant,
+                    foldersFirst
+            );
+        };
 
+        Runnable loadFiles = () -> {
+            viewMediaGrid.trySetStateScanningInProgress(true);
             ExecutorService executor = Executors.newSingleThreadExecutor();
             executor.execute(() -> {
-                IManagerOfFiles managerOfFiles = Domain.getManagerOfFiles(getContext());
-                ModelGetFilesResponse response = managerOfFiles.getFiles(new ModelGetFilesRequest(
-                        filters,
-                        sortVariant,
-                        foldersFirst
-                ));
-
-                getActivity().runOnUiThread(() -> {
-                    viewMediaGrid.setItems(response.files);
-                    buttonScanningReport.setSource(response);
-                    viewMediaGrid.trySetStateScanningInProgress(false);
-                    executor.shutdown();
+                ModelGetFilesRequest request = getTestRequest.get();
+                managerOfFiles.getFilesAsync(request, response -> {
+                    getActivity().runOnUiThread(() -> {
+                        viewMediaGrid.setItems(response.files);
+                        buttonScanningReport.setSource(response);
+                        viewMediaGrid.trySetStateScanningInProgress(false);
+                        executor.shutdown();
+                    });
                 });
             });
         };

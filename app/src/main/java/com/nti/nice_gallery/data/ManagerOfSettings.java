@@ -3,7 +3,7 @@ package com.nti.nice_gallery.data;
 import android.content.Context;
 
 import com.nti.nice_gallery.models.ModelFilters;
-import com.nti.nice_gallery.models.ModelScanList;
+import com.nti.nice_gallery.models.ModelScanParams;
 import com.nti.nice_gallery.views.ViewMediaGrid;
 
 import java.util.Collections;
@@ -18,12 +18,12 @@ public class ManagerOfSettings implements IManagerOfSettings {
     }
 
     @Override
-    public List<ModelScanList> getScanList() {
-        return Collections.emptyList();
+    public ModelScanParams getScanParams() {
+        return new ModelScanParams(null);
     }
 
     @Override
-    public void saveScanList(List<ModelScanList> scanList) {
+    public void saveScanParams(ModelScanParams scanList) {
 
     }
 

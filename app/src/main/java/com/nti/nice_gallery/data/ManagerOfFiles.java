@@ -16,9 +16,14 @@ import com.nti.nice_gallery.models.ModelFileFormat;
 import com.nti.nice_gallery.models.ModelFilters;
 import com.nti.nice_gallery.models.ModelGetFilesRequest;
 import com.nti.nice_gallery.models.ModelGetFilesResponse;
+import com.nti.nice_gallery.models.ModelGetPreviewRequest;
+import com.nti.nice_gallery.models.ModelGetPreviewResponse;
+import com.nti.nice_gallery.models.ModelGetStoragesRequest;
+import com.nti.nice_gallery.models.ModelGetStoragesResponse;
 import com.nti.nice_gallery.models.ModelMediaFile;
 import com.nti.nice_gallery.models.ModelStorage;
-import com.nti.nice_gallery.models.ReadOnlyList;
+import com.nti.nice_gallery.utils.ManagerOfThreads;
+import com.nti.nice_gallery.utils.ReadOnlyList;
 
 import java.io.File;
 import java.io.IOException;
@@ -28,6 +33,7 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 
 import kotlin.jvm.functions.Function1;
 import kotlin.jvm.functions.Function2;
@@ -38,133 +44,18 @@ public class ManagerOfFiles implements IManagerOfFiles {
 
     private final Context context;
 
+    private final ManagerOfThreads managerOfThreads;
+
     public ManagerOfFiles(Context context) {
         this.context = context;
+        this.managerOfThreads = new ManagerOfThreads(context);
     }
 
     @Override
-    public ModelGetFilesResponse getFiles(ModelGetFilesRequest request) {
+    public void getStoragesAsync(ModelGetStoragesRequest request, Consumer<ModelGetStoragesResponse> callback) {
 
-        Function1<ModelStorage, List<ModelMediaFile>> getStorageFiles = storage -> {
-            List<ModelMediaFile> files = new ArrayList<>();
-
-            try {
-                File storageFolder = new File(storage.path);
-                recursionScanning(storageFolder, files, request.filters);
-            } catch (Exception e) {
-                Log.e(LOG_TAG, e.getMessage());
-            }
-
-            return files;
-        };
-
-        final LocalDateTime startedAt = LocalDateTime.now();
-
-        final List<ModelStorage> storages = getAllStorages();
-        final List<ModelMediaFile> files = new ArrayList<>();
-        final List<ModelStorage> storagesWithErrors = new ArrayList<>();
-        final List<ModelMediaFile> filesWithErrors = new ArrayList<>();
-
-        for (ModelStorage storage : storages) {
-            if (storage.error == null) {
-                List<ModelMediaFile> storageFiles = getStorageFiles.invoke(storage);
-                files.addAll(storageFiles);
-                for (ModelMediaFile file : storageFiles) {
-                    if (file.error != null) {
-                        filesWithErrors.add(file);
-                    }
-                }
-            } else {
-                storagesWithErrors.add(storage);
-            }
-        }
-
-        final List<ModelMediaFile> sortedFiles = sortFiles(files, request.sortVariant, request.foldersFirst);
-
-        return new ModelGetFilesResponse(
-                startedAt,
-                LocalDateTime.now(),
-                new ReadOnlyList<>(sortedFiles),
-                new ReadOnlyList<>(storages),
-                new ReadOnlyList<>(filesWithErrors),
-                new ReadOnlyList<>(storagesWithErrors)
-        );
-    }
-
-    @Override
-    public Bitmap getFilePreview(ModelMediaFile item) {
-
-        final Size TARGET_PREVIEW_RESOLUTION = new Size(250, 250);
-        final int VIDEO_PREVIEW_TIMING = 0;
-
-        Function1<ModelMediaFile, Integer> calcInSampleSize = _item -> {
-
-            final int reqWidth = TARGET_PREVIEW_RESOLUTION.getWidth();
-            final int reqHeight = TARGET_PREVIEW_RESOLUTION.getHeight();
-            int width = _item.width;
-            int height = _item.height;
-            int inSampleSize = 1;
-
-            if (height > reqHeight || width > reqWidth) {
-                final int halfHeight = height / 2;
-                final int halfWidth = width / 2;
-                while ((halfHeight / inSampleSize) >= reqHeight && (halfWidth / inSampleSize) >= reqWidth) {
-                    inSampleSize *= 2;
-                }
-            }
-
-            return inSampleSize;
-        };
-
-        Function2<Bitmap, Integer, Bitmap> rotateBitmap = (source, angle) -> {
-            if (source == null || angle == 0) return source;
-            Matrix matrix = new Matrix();
-            matrix.postRotate(angle);
-            return Bitmap.createBitmap(source, 0, 0, source.getWidth(), source.getHeight(), matrix, true);
-        };
-
-        Function1<ModelMediaFile, Bitmap> getImagePreview = _item -> {
-            try {
-                BitmapFactory.Options options = new BitmapFactory.Options();
-                options.inSampleSize = calcInSampleSize.invoke(_item);
-                options.inPreferredConfig = android.graphics.Bitmap.Config.RGB_565;
-                Bitmap result = BitmapFactory.decodeFile(item.path, options);
-                return rotateBitmap.invoke(result, _item.rotation);
-            } catch (Exception e) {
-                Log.e(LOG_TAG, e.getMessage());
-                return null;
-            }
-        };
-
-        Function1<ModelMediaFile, Bitmap> getVideoPreview = _item -> {
-            try (MediaMetadataRetriever retriever = new MediaMetadataRetriever()) {
-                retriever.setDataSource(_item.path);
-                return retriever.getScaledFrameAtTime(
-                        VIDEO_PREVIEW_TIMING,
-                        android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
-                        TARGET_PREVIEW_RESOLUTION.getWidth(),
-                        TARGET_PREVIEW_RESOLUTION.getHeight());
-            } catch (Exception e) {
-                Log.e(LOG_TAG, e.getMessage());
-                return null;
-            }
-        };
-
-        if (item.type == ModelMediaFile.Type.Image) {
-            Bitmap bitmap = getImagePreview.invoke(item);
-            return bitmap;
-        }
-
-        if (item.type == ModelMediaFile.Type.Video) {
-            Bitmap bitmap = getVideoPreview.invoke(item);
-            return bitmap;
-        }
-
-        return null;
-    }
-
-    @Override
-    public List<ModelStorage> getAllStorages() {
+        final ModelGetStoragesRequest DEFAULT_REQUEST = new ModelGetStoragesRequest();
+        final ModelGetStoragesRequest requestFinal = request == null ? DEFAULT_REQUEST : request;
 
         Function1<StorageVolume, ModelStorage> getStorageInfo = volume -> {
             String name = null;
@@ -207,7 +98,149 @@ public class ManagerOfFiles implements IManagerOfFiles {
             storages.add(storage);
         }
 
-        return storages;
+        ModelGetStoragesResponse response = new ModelGetStoragesResponse(
+                new ReadOnlyList<>(storages)
+        );
+
+        managerOfThreads.safeAccept(callback, response);
+    }
+
+    @Override
+    public void getFilesAsync(ModelGetFilesRequest request, Consumer<ModelGetFilesResponse> callback) {
+
+        final ModelGetFilesRequest DEFAULT_REQUEST = new ModelGetFilesRequest(null, null, null);
+        final ModelGetFilesRequest requestFinal = request == null ? DEFAULT_REQUEST : request;
+
+        Function1<ModelStorage, List<ModelMediaFile>> getStorageFiles = storage -> {
+            List<ModelMediaFile> files = new ArrayList<>();
+
+            try {
+                File storageFolder = new File(storage.path);
+                recursionScanning(storageFolder, files, requestFinal.filters);
+            } catch (Exception e) {
+                Log.e(LOG_TAG, e.getMessage());
+            }
+
+            return files;
+        };
+
+        final LocalDateTime startedAt = LocalDateTime.now();
+
+        getStoragesAsync(null, getStoragesResponse -> {
+            final List<ModelMediaFile> files = new ArrayList<>();
+            final List<ModelStorage> storagesWithErrors = new ArrayList<>();
+            final List<ModelMediaFile> filesWithErrors = new ArrayList<>();
+
+            for (ModelStorage storage : getStoragesResponse.storages) {
+                if (storage.error == null) {
+                    List<ModelMediaFile> storageFiles = getStorageFiles.invoke(storage);
+                    files.addAll(storageFiles);
+                    for (ModelMediaFile file : storageFiles) {
+                        if (file.error != null) {
+                            filesWithErrors.add(file);
+                        }
+                    }
+                } else {
+                    storagesWithErrors.add(storage);
+                }
+            }
+
+            final List<ModelMediaFile> sortedFiles = sortFiles(files, requestFinal.sortVariant, requestFinal.foldersFirst);
+
+            ModelGetFilesResponse getFilesResponse = new ModelGetFilesResponse(
+                    startedAt,
+                    LocalDateTime.now(),
+                    new ReadOnlyList<>(sortedFiles),
+                    getStoragesResponse.storages,
+                    new ReadOnlyList<>(filesWithErrors),
+                    new ReadOnlyList<>(storagesWithErrors)
+            );
+
+            managerOfThreads.safeAccept(callback, getFilesResponse);
+        });
+    }
+
+    @Override
+    public void getPreviewAsync(ModelGetPreviewRequest request, Consumer<ModelGetPreviewResponse> callback) {
+
+        final Size TARGET_PREVIEW_RESOLUTION = new Size(250, 250);
+        final int VIDEO_PREVIEW_TIMING = 0;
+
+        final ModelGetPreviewRequest DEFAULT_REQUEST = new ModelGetPreviewRequest(null);
+        final ModelGetPreviewRequest requestFinal = request == null ? DEFAULT_REQUEST : request;
+
+        if (requestFinal == DEFAULT_REQUEST) {
+            managerOfThreads.safeAccept(callback, new ModelGetPreviewResponse(null));
+            return;
+        }
+
+        Function1<ModelMediaFile, Integer> calcInSampleSize = _item -> {
+
+            final int reqWidth = TARGET_PREVIEW_RESOLUTION.getWidth();
+            final int reqHeight = TARGET_PREVIEW_RESOLUTION.getHeight();
+            int width = _item.width;
+            int height = _item.height;
+            int inSampleSize = 1;
+
+            if (height > reqHeight || width > reqWidth) {
+                final int halfHeight = height / 2;
+                final int halfWidth = width / 2;
+                while ((halfHeight / inSampleSize) >= reqHeight && (halfWidth / inSampleSize) >= reqWidth) {
+                    inSampleSize *= 2;
+                }
+            }
+
+            return inSampleSize;
+        };
+
+        Function2<Bitmap, Integer, Bitmap> rotateBitmap = (source, angle) -> {
+            if (source == null || angle == 0) return source;
+            Matrix matrix = new Matrix();
+            matrix.postRotate(angle);
+            return Bitmap.createBitmap(source, 0, 0, source.getWidth(), source.getHeight(), matrix, true);
+        };
+
+        Function1<ModelMediaFile, Bitmap> getImagePreview = _item -> {
+            try {
+                BitmapFactory.Options options = new BitmapFactory.Options();
+                options.inSampleSize = calcInSampleSize.invoke(_item);
+                options.inPreferredConfig = android.graphics.Bitmap.Config.RGB_565;
+                Bitmap result = BitmapFactory.decodeFile(requestFinal.file.path, options);
+                return rotateBitmap.invoke(result, _item.rotation);
+            } catch (Exception e) {
+                Log.e(LOG_TAG, e.getMessage());
+                return null;
+            }
+        };
+
+        Function1<ModelMediaFile, Bitmap> getVideoPreview = _item -> {
+            try (MediaMetadataRetriever retriever = new MediaMetadataRetriever()) {
+                retriever.setDataSource(_item.path);
+                return retriever.getScaledFrameAtTime(
+                        VIDEO_PREVIEW_TIMING,
+                        android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
+                        TARGET_PREVIEW_RESOLUTION.getWidth(),
+                        TARGET_PREVIEW_RESOLUTION.getHeight());
+            } catch (Exception e) {
+                Log.e(LOG_TAG, e.getMessage());
+                return null;
+            }
+        };
+
+        Bitmap bitmap = null;
+
+        if (requestFinal.file.type == ModelMediaFile.Type.Image) {
+            bitmap = getImagePreview.invoke(requestFinal.file);
+        }
+        if (requestFinal.file.type == ModelMediaFile.Type.Video) {
+            bitmap = getVideoPreview.invoke(requestFinal.file);
+        }
+
+        ModelGetPreviewResponse response = new ModelGetPreviewResponse(
+                bitmap
+        );
+
+        managerOfThreads.safeAccept(callback, response);
     }
 
     private void recursionScanning(File folder, List<ModelMediaFile> files, ModelFilters filters) {

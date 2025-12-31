@@ -14,7 +14,7 @@ import com.nti.nice_gallery.R;
 import com.nti.nice_gallery.data.Domain;
 import com.nti.nice_gallery.data.IManagerOfSettings;
 import com.nti.nice_gallery.models.ModelMediaFile;
-import com.nti.nice_gallery.models.ReadOnlyList;
+import com.nti.nice_gallery.utils.ReadOnlyList;
 import com.nti.nice_gallery.utils.Convert;
 import com.nti.nice_gallery.views.grid_items.GridItemLine;
 import com.nti.nice_gallery.views.grid_items.GridItemQuilt;

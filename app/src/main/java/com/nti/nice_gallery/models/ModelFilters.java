@@ -2,6 +2,8 @@ package com.nti.nice_gallery.models;
 
 import androidx.annotation.Nullable;
 
+import com.nti.nice_gallery.utils.ReadOnlyList;
+
 import java.time.LocalDateTime;
 
 public class ModelFilters {

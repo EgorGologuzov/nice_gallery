@@ -11,7 +11,7 @@ public class Domain {
 
     public static IManagerOfSettings getManagerOfSettings(Context context) {
 //        return new ManagerOfSettings();
-        return new ManagerOfSettings_Test1();
+        return new ManagerOfSettings_Test1(context);
     }
 
 }
