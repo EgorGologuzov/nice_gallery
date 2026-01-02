@@ -28,6 +28,9 @@ import com.nti.nice_gallery.utils.ReadOnlyList;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -338,18 +341,21 @@ public class ManagerOfFiles implements IManagerOfFiles {
 
         Function1<File, LocalDateTime> getFileCreationTime = _file -> {
             try {
-                ExifInterface exif = new ExifInterface(_file.getAbsolutePath());
-                String dateString = exif.getAttribute(ExifInterface.TAG_DATETIME_ORIGINAL);
+                if (!_file.isDirectory()) {
+                    ExifInterface exif = new ExifInterface(_file.getAbsolutePath());
+                    String dateString = exif.getAttribute(ExifInterface.TAG_DATETIME_ORIGINAL);
 
-                if (dateString == null) {
-                    return LocalDateTime.ofInstant(Instant.ofEpochMilli(_file.lastModified()), ZoneId.systemDefault());
+                    if (dateString != null) {
+                        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy:MM:dd HH:mm:ss");
+                        return LocalDateTime.parse(dateString, formatter);
+                    }
                 }
 
-                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy:MM:dd HH:mm:ss");
-                return LocalDateTime.parse(dateString, formatter);
+                BasicFileAttributes attrs = Files.readAttributes(Paths.get(_file.getAbsolutePath()), BasicFileAttributes.class);
+                return LocalDateTime.ofInstant(Instant.ofEpochMilli(attrs.creationTime().toMillis()), ZoneId.systemDefault());
             } catch (IOException e) {
                 Log.e(LOG_TAG + 5, e.getMessage());
-                return null;
+                return LocalDateTime.ofInstant(Instant.ofEpochMilli(_file.lastModified()), ZoneId.systemDefault());
             }
         };
 

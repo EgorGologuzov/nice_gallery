@@ -2,19 +2,21 @@ package com.nti.nice_gallery.models;
 
 import androidx.annotation.Nullable;
 
+import com.nti.nice_gallery.utils.ReadOnlyList;
+
 import java.time.LocalDateTime;
 import java.util.Date;
 
 public class ModelMediaFile {
 
-    public static final ModelFileFormat[] supportedMediaFormats = new ModelFileFormat[] {
+    public static final ReadOnlyList<ModelFileFormat> supportedMediaFormats = new ReadOnlyList<>(new ModelFileFormat[] {
             new ModelFileFormat("image/png", "png", Type.Image),
             new ModelFileFormat("image/jpeg", "jpeg", Type.Image),
             new ModelFileFormat("image/jpg", "jpg", Type.Image),
             new ModelFileFormat("image/bmp", "bmp", Type.Image),
             new ModelFileFormat("video/mp4", "mp4", Type.Video),
             new ModelFileFormat("video/x-ms-wmv", "wmv", Type.Video)
-    };
+    });
 
     public enum Type { Image, Video, Folder }
 

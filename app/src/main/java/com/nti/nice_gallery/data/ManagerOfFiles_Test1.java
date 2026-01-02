@@ -105,12 +105,14 @@ public class ManagerOfFiles_Test1 implements IManagerOfFiles {
                 return null;
             }
 
-            String[] imageExtensions = Arrays.stream(ModelMediaFile.supportedMediaFormats)
+            String[] imageExtensions = ModelMediaFile.supportedMediaFormats
+                    .stream()
                     .filter(f -> f.type == ModelMediaFile.Type.Image)
                     .map(f -> f.fileExtension)
                     .toArray(String[]::new);
 
-            String[] videoExtensions = Arrays.stream(ModelMediaFile.supportedMediaFormats)
+            String[] videoExtensions = ModelMediaFile.supportedMediaFormats
+                    .stream()
                     .filter(f -> f.type == ModelMediaFile.Type.Video)
                     .map(f -> f.fileExtension)
                     .toArray(String[]::new);
