@@ -18,6 +18,7 @@ import com.nti.nice_gallery.models.ModelGetFilesRequest;
 import com.nti.nice_gallery.models.ModelGetFilesResponse;
 import com.nti.nice_gallery.models.ModelGetPreviewRequest;
 import com.nti.nice_gallery.models.ModelMediaFile;
+import com.nti.nice_gallery.models.ModelScanParams;
 import com.nti.nice_gallery.utils.ReadOnlyList;
 import com.nti.nice_gallery.views.ViewActionBar;
 import com.nti.nice_gallery.views.ViewMediaGrid;
@@ -102,7 +103,51 @@ public class FragmentMediaAll extends Fragment {
                     maxDuration
             );
 
+            List<ModelScanParams.StorageParams> storagesParams = new ArrayList<>();
+//            storagesParams.add(new ModelScanParams.StorageParams(
+//                    "Память устройства [/storage/emulated/0]",
+//                    ModelScanParams.ScanMode.ScanPathsInListOnly,
+//                    new ReadOnlyList<>(new String[] {
+//                            "/storage/emulated/0/Download",
+//                            "/storage/emulated/0/Movies/AzScreenRecorder"
+//                    })
+//            ));
+//            storagesParams.add(new ModelScanParams.StorageParams(
+//                    "Память устройства [/storage/emulated/0]",
+//                    ModelScanParams.ScanMode.ScanPathsNotInListOnly,
+//                    new ReadOnlyList<>(new String[] {
+//                            "/storage/emulated/0/Download",
+//                            "/storage/emulated/0/Movies/AzScreenRecorder"
+//                    })
+//            ));
+//            storagesParams.add(new ModelScanParams.StorageParams(
+//                    "Память устройства [/storage/emulated/0]",
+//                    ModelScanParams.ScanMode.IgnoreStorage,
+//                    new ReadOnlyList<>(new String[] {
+//                            "/storage/emulated/0/Download",
+//                            "/storage/emulated/0/Movies/AzScreenRecorder"
+//                    })
+//            ));
+//            storagesParams.add(new ModelScanParams.StorageParams(
+//                    "Память устройства [/storage/emulated/0]",
+//                    ModelScanParams.ScanMode.ScanAll,
+//                    new ReadOnlyList<>(new String[] {
+//                            "/storage/emulated/0/Download",
+//                            "/storage/emulated/0/Movies/AzScreenRecorder"
+//                    })
+//            ));
+//            storagesParams.add(new ModelScanParams.StorageParams(
+//                    "Карта памяти [/storage/72AD-2013]",
+//                    ModelScanParams.ScanMode.IgnoreStorage,
+//                    null
+//            ));
+
+            ModelScanParams scanParams = new ModelScanParams(
+                    new ReadOnlyList<>(storagesParams)
+            );
+
             return new ModelGetFilesRequest(
+                    scanParams,
                     filters,
                     sortVariant,
                     foldersFirst

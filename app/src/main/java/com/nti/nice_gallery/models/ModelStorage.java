@@ -4,7 +4,7 @@ import androidx.annotation.Nullable;
 
 public class ModelStorage {
 
-    public enum Type { Primary, Removable, Else}
+    public enum Type { Primary, Removable, Else }
 
     public final String name;
     public final String path;
