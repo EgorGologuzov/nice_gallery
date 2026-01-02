@@ -82,4 +82,14 @@ public class Convert {
 
         return String.format(context.getResources().getString(R.string.format_duration_full), hours, minutes, seconds);
     }
+
+    public <T extends Enum<T>> T indexToEnumValue(Class<T> enumClass, int index) {
+        T[] constants = enumClass.getEnumConstants();
+
+        if (index >= 0 && index < constants.length) {
+            return constants[index];
+        }
+
+        return null;
+    }
 }

@@ -1,6 +1,7 @@
 package com.nti.nice_gallery.data;
 
 import com.nti.nice_gallery.models.ModelFilters;
+import com.nti.nice_gallery.models.ModelGetFilesRequest;
 import com.nti.nice_gallery.models.ModelScanParams;
 import com.nti.nice_gallery.views.ViewMediaGrid;
 
@@ -14,4 +15,7 @@ public interface IManagerOfSettings {
 
     ViewMediaGrid.GridVariant getGridVariant();
     void saveGridVariant(ViewMediaGrid.GridVariant variant);
+
+    ModelGetFilesRequest.SortVariant getSortVariant();
+    void saveSortVariant(ModelGetFilesRequest.SortVariant variant);
 }

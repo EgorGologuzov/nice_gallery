@@ -3,6 +3,7 @@ package com.nti.nice_gallery.data;
 import android.content.Context;
 
 import com.nti.nice_gallery.models.ModelFilters;
+import com.nti.nice_gallery.models.ModelGetFilesRequest;
 import com.nti.nice_gallery.models.ModelScanParams;
 import com.nti.nice_gallery.views.ViewMediaGrid;
 
@@ -19,7 +20,7 @@ public class ManagerOfSettings implements IManagerOfSettings {
 
     @Override
     public ModelScanParams getScanParams() {
-        return new ModelScanParams(null);
+        return null;
     }
 
     @Override
@@ -44,6 +45,16 @@ public class ManagerOfSettings implements IManagerOfSettings {
 
     @Override
     public void saveGridVariant(ViewMediaGrid.GridVariant variant) {
+
+    }
+
+    @Override
+    public ModelGetFilesRequest.SortVariant getSortVariant() {
+        return null;
+    }
+
+    @Override
+    public void saveSortVariant(ModelGetFilesRequest.SortVariant variant) {
 
     }
 }

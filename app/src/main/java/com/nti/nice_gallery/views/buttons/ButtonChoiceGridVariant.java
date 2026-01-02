@@ -8,6 +8,8 @@ import androidx.annotation.DrawableRes;
 import com.nti.nice_gallery.R;
 import com.nti.nice_gallery.data.Domain;
 import com.nti.nice_gallery.data.IManagerOfSettings;
+import com.nti.nice_gallery.utils.Convert;
+import com.nti.nice_gallery.utils.ManagerOfDialogs;
 import com.nti.nice_gallery.utils.ReadOnlyList;
 import com.nti.nice_gallery.views.ViewMediaGrid;
 
@@ -24,7 +26,10 @@ public class ButtonChoiceGridVariant extends ButtonBase {
 
     private int selectedVariantIndex;
     private Consumer<ButtonChoiceGridVariant> variantChangeListener;
+
     private IManagerOfSettings managerOfSettings;
+    private ManagerOfDialogs managerOfDialogs;
+    private Convert convert;
 
     public ButtonChoiceGridVariant(Context context) {
         super(context);
@@ -43,9 +48,13 @@ public class ButtonChoiceGridVariant extends ButtonBase {
 
     private void init() {
         managerOfSettings = Domain.getManagerOfSettings(getContext());
+        managerOfDialogs = new ManagerOfDialogs(getContext());
+        convert = new Convert(getContext());
+
         ViewMediaGrid.GridVariant currentGridVariant = managerOfSettings.getGridVariant();
         VariantInfo selectedVariantInfo = variants.stream().filter(vi -> vi.variant == currentGridVariant).findFirst().get();
         selectedVariantIndex = variants.indexOf(selectedVariantInfo);
+
         setImageResource(selectedVariantInfo.iconResourceId);
         setOnClickListener(v -> onClick());
     }
@@ -59,17 +68,19 @@ public class ButtonChoiceGridVariant extends ButtonBase {
     }
 
     private void onClick() {
-        selectedVariantIndex++;
-
-        if (selectedVariantIndex >= variants.size()) {
-            selectedVariantIndex = 0;
-        }
-
-        setImageResource(variants.get(selectedVariantIndex).iconResourceId);
-
-        if (variantChangeListener != null) {
-            variantChangeListener.accept(this);
-        }
+        managerOfDialogs.showChooseOne(
+                R.string.dialog_title_grid_variant,
+                R.array.enum_grid_variants,
+                selectedVariantIndex,
+                variantIndex -> {
+                    selectedVariantIndex = variantIndex;
+                    managerOfSettings.saveGridVariant(convert.indexToEnumValue(ViewMediaGrid.GridVariant.class, selectedVariantIndex));
+                    setImageResource(variants.get(selectedVariantIndex).iconResourceId);
+                    if (variantChangeListener != null) {
+                        variantChangeListener.accept(this);
+                    }
+                }
+        );
     }
 
     private static class VariantInfo {

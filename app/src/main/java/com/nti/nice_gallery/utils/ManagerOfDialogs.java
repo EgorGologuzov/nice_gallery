@@ -3,9 +3,12 @@ package com.nti.nice_gallery.utils;
 import android.app.AlertDialog;
 import android.content.Context;
 
+import androidx.annotation.ArrayRes;
 import androidx.annotation.StringRes;
 
 import com.nti.nice_gallery.R;
+
+import java.util.function.Consumer;
 
 public class ManagerOfDialogs {
 
@@ -104,6 +107,45 @@ public class ManagerOfDialogs {
                     }
                 })
                 .setCancelable(false)
+                .create()
+                .show();
+    }
+
+    public void showChooseOne(@StringRes int title, @ArrayRes int variants, int selectedIndex, Consumer<Integer> onChosen) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(context);
+        builder.setTitle(title)
+                .setSingleChoiceItems(variants, selectedIndex, (dialog, which) -> {
+                    dialog.dismiss();
+                    if (onChosen != null) {
+                        onChosen.accept(which);
+                    }
+                })
+                .create()
+                .show();
+    }
+
+    public void showChooseOne(@StringRes int title, String[] variants, int selectedIndex, Consumer<Integer> onChosen) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(context);
+        builder.setTitle(title)
+                .setSingleChoiceItems(variants, selectedIndex, (dialog, which) -> {
+                    dialog.dismiss();
+                    if (onChosen != null) {
+                        onChosen.accept(which);
+                    }
+                })
+                .create()
+                .show();
+    }
+
+    public void showChooseOne(String title, String[] variants, int selectedIndex, Consumer<Integer> onChosen) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(context);
+        builder.setTitle(title)
+                .setSingleChoiceItems(variants, selectedIndex, (dialog, which) -> {
+                    dialog.dismiss();
+                    if (onChosen != null) {
+                        onChosen.accept(which);
+                    }
+                })
                 .create()
                 .show();
     }

@@ -42,8 +42,28 @@
 <!--Dialogs-->
     <string name="dialog_title_permission_required">Необходимо разрешение</string>
     <string name="dialog_title_scanning_report">Отчет о сканировании</string>
+    <string name="dialog_title_grid_variant">Вариант сетки</string>
+    <string name="dialog_title_sort_variant">Вариант сортировки</string>
     <string name="dialog_button_ok">ОК</string>
     <string name="dialog_button_yes">Да</string>
     <string name="dialog_button_no">Нет</string>
+
+<!--Enums-->
+    <string-array name="enum_grid_variants">
+        <item>Список</item>
+        <item>Три колонки</item>
+        <item>Шесть колонок</item>
+        <item>Одеяло</item>
+    </string-array>
+    <string-array name="enum_sort_variants">
+        <item>По имени (А-Я)</item>
+        <item>По имени (Я-А)</item>
+        <item>По дате создания (А-Я)</item>
+        <item>По дате создания (Я-А)</item>
+        <item>По дате изменения (А-Я)</item>
+        <item>По дате изменения (Я-А)</item>
+        <item>По весу (А-Я)</item>
+        <item>По весу (Я-А)</item>
+    </string-array>
 
 </resources>
