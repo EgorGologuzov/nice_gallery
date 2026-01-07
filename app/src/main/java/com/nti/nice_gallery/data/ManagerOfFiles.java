@@ -1,5 +1,6 @@
 package com.nti.nice_gallery.data;
 
+import android.app.usage.StorageStatsManager;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -38,6 +39,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.function.Consumer;
 
 import kotlin.jvm.functions.Function1;
@@ -68,21 +70,36 @@ public class ManagerOfFiles implements IManagerOfFiles {
             String name = null;
             String path = null;
             ModelStorage.Type type = null;
+            String description = null;
+            Long freeSpace = null;
+            Long totalSpace = null;
             Exception error = null;
 
             try {
                 File storageDir = volume.getDirectory();
                 path = storageDir.getAbsolutePath();
 
-                name = String.format(context.getResources().getString(R.string.format_name_storage_name),
-                        volume.getDescription(context),
-                        path);
+                name = String.format(context.getResources().getString(R.string.format_name_storage_name), path);
 
                 type = volume.isPrimary()
                         ? ModelStorage.Type.Primary
                         : volume.isRemovable()
                         ? ModelStorage.Type.Removable
                         : ModelStorage.Type.Else;
+
+                description = volume.getDescription(context);
+
+
+
+                if (volume.isPrimary()) {
+                    UUID uuid = StorageManager.UUID_DEFAULT;
+                    StorageStatsManager statsManager = (StorageStatsManager) context.getSystemService(Context.STORAGE_STATS_SERVICE);
+                    freeSpace = statsManager.getFreeBytes(uuid);
+                    totalSpace = statsManager.getTotalBytes(uuid);
+                } else {
+                    freeSpace = storageDir.getFreeSpace();
+                    totalSpace = storageDir.getTotalSpace();
+                }
             } catch (Exception e) {
                 error = e;
                 Log.e(LOG_TAG + 1, e.getMessage());
@@ -92,6 +109,9 @@ public class ManagerOfFiles implements IManagerOfFiles {
                     name,
                     path,
                     type,
+                    description,
+                    freeSpace,
+                    totalSpace,
                     error
             );
         };
@@ -150,10 +170,19 @@ public class ManagerOfFiles implements IManagerOfFiles {
                 final List<ModelMediaFile> filesWithErrors = new ArrayList<>();
 
                 for (ModelStorage storage : getStoragesResponse.storages) {
+
+                    File storageRoot = new File(storage.path);
+                    String[] storageChildren = storageRoot.list();
+                    int childElementsCount = 0;
+
+                    if (storageChildren != null) {
+                        childElementsCount = storageChildren.length;
+                    }
+
                     files.add(new ModelMediaFile(
-                            storage.name,
+                            storage.description,
                             storage.path,
-                            ModelMediaFile.Type.Folder,
+                            ModelMediaFile.Type.Storage,
                             null,
                             null,
                             null,
@@ -162,6 +191,9 @@ public class ManagerOfFiles implements IManagerOfFiles {
                             null,
                             null,
                             null,
+                            childElementsCount,
+                            storage.freeSpace,
+                            storage.totalSpace,
                             null
                     ));
                 }
@@ -605,6 +637,7 @@ public class ManagerOfFiles implements IManagerOfFiles {
         Integer rotation = null;
         String extension = null;
         Integer duration = null;
+        Integer childElementsCount = null;
         Exception error = null;
 
         try {
@@ -637,6 +670,14 @@ public class ManagerOfFiles implements IManagerOfFiles {
                 rotation = info.rotation;
                 duration = info.duration;
             }
+
+            if (type == ModelMediaFile.Type.Folder) {
+                File folder = new File(path);
+                String[] folderFiles = folder.list();
+                if (folderFiles != null) {
+                    childElementsCount = folderFiles.length;
+                }
+            }
         } catch (Exception e) {
             error = e;
             Log.e(LOG_TAG + 8, e.getMessage());
@@ -654,6 +695,9 @@ public class ManagerOfFiles implements IManagerOfFiles {
                 rotation,
                 extension,
                 duration,
+                childElementsCount,
+                null,
+                null,
                 error
         );
     }

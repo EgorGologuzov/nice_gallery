@@ -17,8 +17,12 @@
     <!--Duration-->
     <string name="format_duration_short">%d:%02d</string>
     <string name="format_duration_full">%d:%02d:%02d</string>
+    <!--Elements count-->
+    <string name="format_elements_count">%d элемент(а/ов)</string>
+    <!--Storage space-->
+    <string name="format_free_space_from_total_space">Свободно %s из %s</string>
     <!--Names-->
-    <string name="format_name_storage_name">%s [%s]</string>
+    <string name="format_name_storage_name">[%s]</string>
 
 <!--Symbols-->
     <string name="symbol_dot_separator">" • "</string>

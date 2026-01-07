@@ -76,12 +76,22 @@ public class GridItemLine extends GridItemBase {
 
             ArrayList<String> infoItems = new ArrayList<>();
 
-            if (model.type != ModelMediaFile.Type.Folder) {
+            if (model.isFile) {
                 infoItems.add(convert.weightToString(model.weight));
                 infoItems.add(convert.sizeToString(model.width, model.height));
+                infoItems.add(convert.dateToFullNumericDateString(model.createdAt));
             }
 
-            infoItems.add(convert.dateToFullNumericDateString(model.createdAt));
+            if (model.isFolder) {
+                infoItems.add(convert.dateToFullNumericDateString(model.createdAt));
+                infoItems.add(getContext().getString(R.string.format_elements_count, model.childElementsCount));
+            }
+
+            if (model.isStorage) {
+                String freeSpace = convert.weightToString(model.freeSpace);
+                String totalSpace = convert.weightToString(model.totalSpace);
+                infoItems.add(getContext().getString(R.string.format_free_space_from_total_space, freeSpace, totalSpace));
+            }
 
             info = String.join(getContext().getResources().getString(R.string.symbol_dot_separator), infoItems);
 
@@ -97,18 +107,18 @@ public class GridItemLine extends GridItemBase {
             if (info == null) { info = getContext().getResources().getString(R.string.message_error_load_file_info_failed); }
         }
 
-        if (info.equals("null")) {
-            info = "";
-        }
-
         nameView.setText(name);
         pathView.setText(path);
         infoView.setText(info);
         infoView2.setText(info2);
         infoView2.setVisibility(infoView2Visibility);
 
-        try {
-            if (model.type != ModelMediaFile.Type.Folder) {
+        if (model.isFolder) {
+            imageView.setImageResource(R.drawable.baseline_folder_24_orange_700);
+        } else if (model.isStorage) {
+            imageView.setImageResource(R.drawable.baseline_storage_24);
+        } else {
+            try {
                 ModelGetPreviewRequest previewRequest = new ModelGetPreviewRequest(
                         model
                 );
@@ -120,11 +130,9 @@ public class GridItemLine extends GridItemBase {
                         post(() -> imageView.setImageResource(R.drawable.baseline_error_24_orange_700));
                     }
                 });
-            } else {
-                imageView.setImageResource(R.drawable.baseline_folder_24_orange_700);
+            } catch (Exception e) {
+                imageView.setImageResource(R.drawable.baseline_error_24_orange_700);
             }
-        } catch (Exception e) {
-            imageView.setImageResource(R.drawable.baseline_error_24_orange_700);
         }
     }
 }

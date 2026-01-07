@@ -20,22 +20,55 @@ public class ModelMediaFile {
 
     public enum Type { Image, Video, Folder, Storage }
 
-    public @interface ForFilesOnly {}
-    public @interface ForVideosOnly {}
+    public @interface Required {}
+    public @interface ForImages {}
+    public @interface ForVideos {}
+    public @interface ForFolders {}
+    public @interface ForStorages {}
 
+    @Required
     public final String name;
+    @Required
     public final String path;
+    @Required
     public final Type type;
+
+    @ForImages
+    @ForVideos
+    @ForFolders
     public final LocalDateTime createdAt;
+    @ForImages
+    @ForVideos
+    @ForFolders
     public final LocalDateTime updatedAt;
 
-    @ForFilesOnly public final Long weight;
-    @ForFilesOnly public final Integer width;
-    @ForFilesOnly public final Integer height;
-    @ForFilesOnly public final Integer rotation;
-    @ForFilesOnly public final String extension;
+    @ForImages
+    @ForVideos
+    public final Long weight;
+    @ForImages
+    @ForVideos
+    public final Integer width;
+    @ForImages
+    @ForVideos
+    public final Integer height;
+    @ForImages
+    @ForVideos
+    public final Integer rotation;
+    @ForImages
+    @ForVideos
+    public final String extension;
 
-    @ForVideosOnly public final Integer duration;
+    @ForVideos
+    public final Integer duration;
+
+    @ForFolders
+    @ForStorages
+    public final Integer childElementsCount;
+
+    @ForStorages
+    public final Long freeSpace;
+    @ForStorages
+    public final Long totalSpace;
 
     @Nullable public final Exception error;
 
@@ -52,12 +85,15 @@ public class ModelMediaFile {
             Type type,
             LocalDateTime createdAt,
             LocalDateTime updatedAt,
-            @ForFilesOnly Long weight,
-            @ForFilesOnly Integer width,
-            @ForFilesOnly Integer height,
-            @ForFilesOnly Integer rotation,
-            @ForFilesOnly String extension,
-            @ForVideosOnly Integer duration,
+            Long weight,
+            Integer width,
+            Integer height,
+            Integer rotation,
+            String extension,
+            Integer duration,
+            Integer childElementsCount,
+            Long freeSpace,
+            Long totalSpace,
             @Nullable Exception error
     ) {
         this.name = name;
@@ -71,6 +107,9 @@ public class ModelMediaFile {
         this.rotation = rotation;
         this.extension = extension;
         this.duration = duration;
+        this.childElementsCount = childElementsCount;
+        this.freeSpace = freeSpace;
+        this.totalSpace = totalSpace;
         this.error = error;
 
         isFile = type == Type.Image || type == Type.Video;

@@ -53,12 +53,12 @@ public class GridItemQuilt extends GridItemBase {
         try {
             ArrayList<String> infoItems = new ArrayList<>();
 
-            if (model.type == ModelMediaFile.Type.Folder) {
+            if (model.isDirectory) {
                 infoItems.add(model.name);
-            } else if (model.type == ModelMediaFile.Type.Image) {
+            } else if (model.isImage) {
                 infoItems.add(model.extension.toUpperCase());
                 infoItems.add(convert.weightToString(model.weight));
-            } else if (model.type == ModelMediaFile.Type.Video) {
+            } else if (model.isVideo) {
                 infoItems.add(getContext().getResources().getString(R.string.symbol_play_video));
                 infoItems.add(convert.durationToTimeString(model.duration));
                 infoItems.add(convert.weightToString(model.weight));
@@ -72,8 +72,12 @@ public class GridItemQuilt extends GridItemBase {
 
         infoView.setText(info);
 
-        try {
-            if (model.type != ModelMediaFile.Type.Folder) {
+        if (model.isFolder) {
+            imageView.setImageResource(R.drawable.baseline_folder_24_orange_700);
+        } else if (model.isStorage) {
+            imageView.setImageResource(R.drawable.baseline_storage_24);
+        } else {
+            try {
                 ModelGetPreviewRequest previewRequest = new ModelGetPreviewRequest(
                         model
                 );
@@ -85,11 +89,9 @@ public class GridItemQuilt extends GridItemBase {
                         post(() -> imageView.setImageResource(R.drawable.baseline_error_24_orange_700));
                     }
                 });
-            } else {
-                imageView.setImageResource(R.drawable.baseline_folder_24_orange_700);
+            } catch (Exception e) {
+                imageView.setImageResource(R.drawable.baseline_error_24_orange_700);
             }
-        } catch (Exception e) {
-            imageView.setImageResource(R.drawable.baseline_error_24_orange_700);
         }
     }
 }

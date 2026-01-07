@@ -62,7 +62,7 @@ public class ButtonScanningReport extends ButtonBase {
                 addLine.invoke("");
 
                 for (ModelStorage storage : source.scannedStorages) {
-                    addLine.invoke((storage.error == null ? "[ OK ]" : "[ ERR ]") + " " + storage.name);
+                    addLine.invoke((storage.error == null ? "[ OK ]" : "[ ERR ]") + " " + storage.description + " " + storage.name);
                 }
 
                 addLine.invoke("");

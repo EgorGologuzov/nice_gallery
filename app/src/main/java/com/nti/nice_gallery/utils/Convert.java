@@ -25,7 +25,7 @@ public class Convert {
 
     public String weightToString(Long weight) {
 
-        final int BASE = 1000;
+        final int BASE = 1024;
 
         if (weight == null) {
             weight = 0L;

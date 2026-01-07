@@ -66,6 +66,7 @@ public class ManagerOfFiles_Test1 implements IManagerOfFiles {
         final int MAX_VIDEO_WEIGHT = 2_000_000_000;
         final int MAX_FOLDER_WEIGHT = 2_000_000_000;
         final int MAX_VIDEO_DURATION = 7_200;
+        final int MAX_CHILD_ELEMENTS_COUNT = 20;
         final int SHARE_OF_IMAGES = 50;
         final int SHARE_OF_VIDEOS = 30;
         final int SHARE_OF_FOLDERS = 20;
@@ -165,6 +166,10 @@ public class ManagerOfFiles_Test1 implements IManagerOfFiles {
             return type == ModelMediaFile.Type.Video ? random.nextInt(MAX_VIDEO_DURATION) : null;
         };
 
+        Function1<ModelMediaFile.Type, Integer> randomChildElementsCount = (type) -> {
+            return type == ModelMediaFile.Type.Folder ? random.nextInt(MAX_CHILD_ELEMENTS_COUNT) : null;
+        };
+
         for (int i = 0; i < ITEMS_COUNT; i++) {
 
             ModelMediaFile.Type type = randomType.get();
@@ -176,6 +181,7 @@ public class ManagerOfFiles_Test1 implements IManagerOfFiles {
             LocalDateTime updatedAt = randomDate.get();
             Size resolution = randomSize.invoke(type);
             Integer duration = randomDuration.invoke(type);
+            Integer childElementsCount = randomChildElementsCount.invoke(type);
 
             int width = -1, height = -1, rotation = 0;
 
@@ -196,6 +202,9 @@ public class ManagerOfFiles_Test1 implements IManagerOfFiles {
                     rotation,
                     extension,
                     duration,
+                    childElementsCount,
+                    null,
+                    null,
                     null
             ));
         }
@@ -242,9 +251,33 @@ public class ManagerOfFiles_Test1 implements IManagerOfFiles {
     public void getStoragesAsync(ModelGetStoragesRequest request, Consumer<ModelGetStoragesResponse> callback) {
         List<ModelStorage> storages = new ArrayList<>();
 
-        storages.add(new ModelStorage("Внутреннее хранилище", "context://internal_storage", ModelStorage.Type.Primary, null));
-        storages.add(new ModelStorage("SD карта", "context://SD-card/hk78cJG435", ModelStorage.Type.Removable, null));
-        storages.add(new ModelStorage("USB накопитель", "context://USB/hgTd67Hm3", ModelStorage.Type.Removable, null));
+        storages.add(new ModelStorage(
+                "[/storage/emulated/0]",
+                "/storage/emulated/0",
+                ModelStorage.Type.Primary,
+                "Внутреннее хранилище",
+                64_000_000_000L,
+                128_000_000_000L,
+                null
+        ));
+        storages.add(new ModelStorage(
+                "[/storage/emulated/0]",
+                "/storage/72AD-2013",
+                ModelStorage.Type.Removable,
+                "SD-карта",
+                32_000_000_000L,
+                64_000_000_000L,
+                null
+        ));
+        storages.add(new ModelStorage(
+                "[/storage/emulated/0]",
+                "/storage/49FP-2019",
+                ModelStorage.Type.Removable,
+                "USB-накопитель",
+                16_000_000_000L,
+                32_000_000_000L,
+                null
+        ));
 
         ModelGetStoragesResponse response = new ModelGetStoragesResponse(
                 new ReadOnlyList<>(storages)
