@@ -18,7 +18,7 @@ public class ModelMediaFile {
             new ModelFileFormat("video/x-ms-wmv", "wmv", Type.Video)
     });
 
-    public enum Type { Image, Video, Folder }
+    public enum Type { Image, Video, Folder, Storage }
 
     public @interface ForFilesOnly {}
     public @interface ForVideosOnly {}
@@ -38,6 +38,13 @@ public class ModelMediaFile {
     @ForVideosOnly public final Integer duration;
 
     @Nullable public final Exception error;
+
+    public final boolean isFile;
+    public final boolean isDirectory;
+    public final boolean isImage;
+    public final boolean isVideo;
+    public final boolean isFolder;
+    public final boolean isStorage;
 
     public ModelMediaFile(
             String name,
@@ -65,5 +72,12 @@ public class ModelMediaFile {
         this.extension = extension;
         this.duration = duration;
         this.error = error;
+
+        isFile = type == Type.Image || type == Type.Video;
+        isDirectory = type == Type.Folder || type == Type.Storage;
+        isImage = type == Type.Image;
+        isVideo = type == Type.Video;
+        isFolder = type == Type.Folder;
+        isStorage = type == Type.Storage;
     }
 }

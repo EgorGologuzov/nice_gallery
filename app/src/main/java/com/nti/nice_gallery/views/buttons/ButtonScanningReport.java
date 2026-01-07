@@ -57,11 +57,20 @@ public class ButtonScanningReport extends ButtonBase {
             addLine.invoke("Длилось: " + ChronoUnit.MILLIS.between(source.scanningStartedAt, source.scanningFinishedAt) / 1000f + " сек. (начато: " + source.scanningStartedAt + ")");
             addLine.invoke("");
 
-            addLine.invoke("Найдено хранилищ (" + source.scannedStorages.size() + "):");
-            addLine.invoke("");
+            if (source.scannedStorages != null && !source.scannedStorages.isEmpty()) {
+                addLine.invoke("Найдено хранилищ (" + source.scannedStorages.size() + "):");
+                addLine.invoke("");
 
-            for (ModelStorage storage : source.scannedStorages) {
-                addLine.invoke((storage.error == null ? "[ OK ]" : "[ ERR ]") + " " + storage.name);
+                for (ModelStorage storage : source.scannedStorages) {
+                    addLine.invoke((storage.error == null ? "[ OK ]" : "[ ERR ]") + " " + storage.name);
+                }
+
+                addLine.invoke("");
+            }
+
+            if (source.path != null) {
+                addLine.invoke("Сканируемый путь: " + source.path);
+                addLine.invoke("");
             }
 
             int countFolders = 0, countFiles = 0;
@@ -74,7 +83,6 @@ public class ButtonScanningReport extends ButtonBase {
                 }
             }
 
-            addLine.invoke("");
             addLine.invoke("Найдено папок (" + countFolders + ")");
             addLine.invoke("");
 

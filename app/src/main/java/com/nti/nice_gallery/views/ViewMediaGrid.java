@@ -2,8 +2,10 @@ package com.nti.nice_gallery.views;
 
 import android.content.Context;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.util.Size;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -14,8 +16,10 @@ import com.nti.nice_gallery.R;
 import com.nti.nice_gallery.data.Domain;
 import com.nti.nice_gallery.data.IManagerOfSettings;
 import com.nti.nice_gallery.models.ModelMediaFile;
+import com.nti.nice_gallery.utils.ManagerOfThreads;
 import com.nti.nice_gallery.utils.ReadOnlyList;
 import com.nti.nice_gallery.utils.Convert;
+import com.nti.nice_gallery.views.grid_items.GridItemBase;
 import com.nti.nice_gallery.views.grid_items.GridItemLine;
 import com.nti.nice_gallery.views.grid_items.GridItemQuilt;
 import com.nti.nice_gallery.views.grid_items.GridItemSquare;
@@ -45,8 +49,10 @@ public class ViewMediaGrid extends ScrollView {
     private int renderedItemsCount = 0;
     private State state = State.StandbyMode;
     private Consumer<ViewMediaGrid> stateChangeListener;
+    private Consumer<GridItemBase> itemClickListener;
 
     private IManagerOfSettings managerOfSettings;
+    private ManagerOfThreads managerOfThreads;
 
     public ViewMediaGrid(Context context) {
         super(context);
@@ -65,6 +71,7 @@ public class ViewMediaGrid extends ScrollView {
 
     private void init() {
         managerOfSettings = Domain.getManagerOfSettings(getContext());
+        managerOfThreads = new ManagerOfThreads(getContext());
         gridVariant = managerOfSettings.getGridVariant();
 
         LayoutParams params = new LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
@@ -151,6 +158,10 @@ public class ViewMediaGrid extends ScrollView {
         stateChangeListener = listener;
     }
 
+    public void setItemClickListener(Consumer<GridItemBase> listener) {
+        itemClickListener = listener;
+    }
+
     private void updateGrid() {
         if (state == State.ScanningInProgress) {
             container.removeAllViews();
@@ -183,7 +194,12 @@ public class ViewMediaGrid extends ScrollView {
     private void renderNextItems() {
         final int RENDERING_STEP_ITEMS_COUNT = 25;
 
-        if (state == State.FilesLoading || this.renderedItemsCount == items.size()) {
+        if (this.state == State.FilesLoading
+                || this.state == State.ScanningInProgress
+                || this.items == null
+                || this.items.isEmpty()
+                || this.renderedItemsCount == this.items.size()
+        ) {
             return;
         }
 
@@ -205,7 +221,7 @@ public class ViewMediaGrid extends ScrollView {
                 pageContainer.addView(itemView);
             }
 
-            this.renderedItemsCount = to;
+            renderedItemsCount = to;
 
             return pageContainer;
         };
@@ -354,7 +370,7 @@ public class ViewMediaGrid extends ScrollView {
             });
         };
 
-        Runnable loadOnePage = () -> {
+        Runnable renderOnePage = () -> {
             ExecutorService executor = Executors.newSingleThreadExecutor();
             executor.execute(() -> {
                 LinearLayout pageContainer = null;
@@ -365,6 +381,8 @@ public class ViewMediaGrid extends ScrollView {
                     case SixColumns: pageContainer = renderNextForColumnsVariant.invoke(6); break;
                     case Quilt: pageContainer = renderNextForQuiltVariant.get(); break;
                 }
+
+                setupGridItemsClickListener(pageContainer, item -> managerOfThreads.safeAccept(itemClickListener, item));
 
                 final LinearLayout pageContainerFinal = pageContainer;
 
@@ -378,6 +396,25 @@ public class ViewMediaGrid extends ScrollView {
             });
         };
 
-        loadOnePage.run();
+        renderOnePage.run();
+    }
+
+    private void setupGridItemsClickListener(ViewGroup root, Consumer<GridItemBase> listener) {
+        if (root == null) return;
+
+        int childCount = root.getChildCount();
+
+        for (int i = 0; i < childCount; i++) {
+            View child = root.getChildAt(i);
+
+            if (child instanceof GridItemBase) {
+                GridItemBase item = (GridItemBase) child;
+                item.setOnClickListener(listener);
+            }
+
+            if (child instanceof ViewGroup) {
+                setupGridItemsClickListener((ViewGroup) child, listener);
+            }
+        }
     }
 }

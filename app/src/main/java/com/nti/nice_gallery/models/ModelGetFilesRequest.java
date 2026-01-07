@@ -15,17 +15,20 @@ public class ModelGetFilesRequest {
         ByWeightDesc
     }
 
+    @Nullable public final String path;
     @Nullable public final ModelScanParams scanParams;
     @Nullable public final ModelFilters filters;
     @Nullable public final SortVariant sortVariant;
     public final boolean foldersFirst;
 
     public ModelGetFilesRequest(
+            @Nullable String path,
             @Nullable ModelScanParams scanParams,
             @Nullable ModelFilters filters,
             @Nullable SortVariant sortVariant,
             @Nullable Boolean foldersFirst
     ) {
+        this.path = path;
         this.scanParams = scanParams;
         this.filters = filters;
         this.sortVariant = sortVariant;

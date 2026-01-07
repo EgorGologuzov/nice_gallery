@@ -23,8 +23,6 @@ public class GridItemQuilt extends GridItemBase {
 
     private static final String LOG_TAG = "GridItemQuilt";
 
-    private ModelMediaFile model;
-
     private TextView infoView;
     private ImageView imageView;
 
@@ -48,16 +46,8 @@ public class GridItemQuilt extends GridItemBase {
         convert = new Convert(getContext());
     }
 
-    public ModelMediaFile getModel() {
-        return model;
-    }
-
-    public void setModel(ModelMediaFile model) {
-        this.model = model;
-        updateView();
-    }
-
-    private void updateView() {
+    @Override
+    protected void updateView() {
         String info = null;
 
         try {

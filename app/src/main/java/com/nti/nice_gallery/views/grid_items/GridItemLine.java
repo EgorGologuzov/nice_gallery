@@ -24,8 +24,6 @@ public class GridItemLine extends GridItemBase {
 
     private static final String LOG_TAG = "GridItemView";
 
-    private ModelMediaFile model;
-
     private ImageView imageView;
     private TextView nameView;
     private TextView pathView;
@@ -64,16 +62,8 @@ public class GridItemLine extends GridItemBase {
         convert = new Convert(getContext());
     }
 
-    public ModelMediaFile getModel() {
-        return model;
-    }
-
-    public void setModel(ModelMediaFile model) {
-        this.model = model;
-        updateView();
-    }
-
-    private void updateView() {
+    @Override
+    protected void updateView() {
         String name = null;
         String path = null;
         String info = null;
@@ -105,6 +95,10 @@ public class GridItemLine extends GridItemBase {
         } catch (Exception e) {
             Log.e(LOG_TAG, e.getMessage());
             if (info == null) { info = getContext().getResources().getString(R.string.message_error_load_file_info_failed); }
+        }
+
+        if (info.equals("null")) {
+            info = "";
         }
 
         nameView.setText(name);

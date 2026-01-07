@@ -36,7 +36,6 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
@@ -45,6 +44,8 @@ import kotlin.jvm.functions.Function1;
 import kotlin.jvm.functions.Function2;
 
 public class ManagerOfFiles implements IManagerOfFiles {
+
+    public static final String PATH_ROOT = "/";
 
     private static final String LOG_TAG = "ManagerOfFiles";
 
@@ -114,7 +115,7 @@ public class ManagerOfFiles implements IManagerOfFiles {
     @Override
     public void getFilesAsync(ModelGetFilesRequest request, Consumer<ModelGetFilesResponse> callback) {
 
-        final ModelGetFilesRequest DEFAULT_REQUEST = new ModelGetFilesRequest(null, null, null, null);
+        final ModelGetFilesRequest DEFAULT_REQUEST = new ModelGetFilesRequest(null, null, null, null, null);
         final ModelGetFilesRequest requestFinal = request == null ? DEFAULT_REQUEST : request;
 
         Function1<ModelStorage, List<ModelMediaFile>> getStorageFiles = storage -> {
@@ -132,7 +133,7 @@ public class ManagerOfFiles implements IManagerOfFiles {
 
             try {
                 File storageFolder = new File(storage.path);
-                recursionScanning(storageFolder, files, requestFinal.filters, storageParams);
+                storageRecursionScanning(storageFolder, files, requestFinal.filters, storageParams);
             } catch (Exception e) {
                 Log.e(LOG_TAG + 2, e.getMessage());
             }
@@ -140,24 +141,58 @@ public class ManagerOfFiles implements IManagerOfFiles {
             return files;
         };
 
-        final LocalDateTime startedAt = LocalDateTime.now();
+        Runnable returnStoragesList = () -> {
+            final LocalDateTime startedAt = LocalDateTime.now();
 
-        getStoragesAsync(null, getStoragesResponse -> {
+            getStoragesAsync(null, getStoragesResponse -> {
+                final List<ModelMediaFile> files = new ArrayList<>();
+                final List<ModelStorage> storagesWithErrors = new ArrayList<>();
+                final List<ModelMediaFile> filesWithErrors = new ArrayList<>();
+
+                for (ModelStorage storage : getStoragesResponse.storages) {
+                    files.add(new ModelMediaFile(
+                            storage.name,
+                            storage.path,
+                            ModelMediaFile.Type.Folder,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null
+                    ));
+                }
+
+                final List<ModelMediaFile> sortedFiles = sortFiles(files, requestFinal.sortVariant, requestFinal.foldersFirst);
+
+                ModelGetFilesResponse getFilesResponse = new ModelGetFilesResponse(
+                        startedAt,
+                        LocalDateTime.now(),
+                        new ReadOnlyList<>(sortedFiles),
+                        getStoragesResponse.storages,
+                        new ReadOnlyList<>(filesWithErrors),
+                        new ReadOnlyList<>(storagesWithErrors),
+                        requestFinal.path
+                );
+
+                managerOfThreads.safeAccept(callback, getFilesResponse);
+            });
+        };
+
+        Runnable returnFolderFilesList = () -> {
+            final LocalDateTime startedAt = LocalDateTime.now();
+
             final List<ModelMediaFile> files = new ArrayList<>();
-            final List<ModelStorage> storagesWithErrors = new ArrayList<>();
             final List<ModelMediaFile> filesWithErrors = new ArrayList<>();
 
-            for (ModelStorage storage : getStoragesResponse.storages) {
-                if (storage.error == null) {
-                    List<ModelMediaFile> storageFiles = getStorageFiles.invoke(storage);
-                    files.addAll(storageFiles);
-                    for (ModelMediaFile file : storageFiles) {
-                        if (file.error != null) {
-                            filesWithErrors.add(file);
-                        }
-                    }
-                } else {
-                    storagesWithErrors.add(storage);
+            folderScanning(new File(requestFinal.path), files, requestFinal.filters);
+
+            for (ModelMediaFile file : files) {
+                if (file.error != null) {
+                    filesWithErrors.add(file);
                 }
             }
 
@@ -167,13 +202,66 @@ public class ManagerOfFiles implements IManagerOfFiles {
                     startedAt,
                     LocalDateTime.now(),
                     new ReadOnlyList<>(sortedFiles),
-                    getStoragesResponse.storages,
+                    new ReadOnlyList<>(new ArrayList<>()),
                     new ReadOnlyList<>(filesWithErrors),
-                    new ReadOnlyList<>(storagesWithErrors)
+                    new ReadOnlyList<>(new ArrayList<>()),
+                    requestFinal.path
             );
 
             managerOfThreads.safeAccept(callback, getFilesResponse);
-        });
+        };
+
+        Runnable scanByParams = () -> {
+            final LocalDateTime startedAt = LocalDateTime.now();
+
+            getStoragesAsync(null, getStoragesResponse -> {
+                final List<ModelMediaFile> files = new ArrayList<>();
+                final List<ModelStorage> storagesWithErrors = new ArrayList<>();
+                final List<ModelMediaFile> filesWithErrors = new ArrayList<>();
+
+                for (ModelStorage storage : getStoragesResponse.storages) {
+                    if (storage.error == null) {
+                        List<ModelMediaFile> storageFiles = getStorageFiles.invoke(storage);
+                        files.addAll(storageFiles);
+                        for (ModelMediaFile file : storageFiles) {
+                            if (file.error != null) {
+                                filesWithErrors.add(file);
+                            }
+                        }
+                    } else {
+                        storagesWithErrors.add(storage);
+                    }
+                }
+
+                final List<ModelMediaFile> sortedFiles = sortFiles(files, requestFinal.sortVariant, requestFinal.foldersFirst);
+
+                ModelGetFilesResponse getFilesResponse = new ModelGetFilesResponse(
+                        startedAt,
+                        LocalDateTime.now(),
+                        new ReadOnlyList<>(sortedFiles),
+                        getStoragesResponse.storages,
+                        new ReadOnlyList<>(filesWithErrors),
+                        new ReadOnlyList<>(storagesWithErrors),
+                        null
+                );
+
+                managerOfThreads.safeAccept(callback, getFilesResponse);
+            });
+        };
+
+        Runnable scanByPath = () -> {
+            if (Objects.equals(requestFinal.path, PATH_ROOT)) {
+                returnStoragesList.run();
+            } else {
+                returnFolderFilesList.run();
+            }
+        };
+
+        if (requestFinal.path == null) {
+            scanByParams.run();
+        } else {
+            scanByPath.run();
+        }
     }
 
     @Override
@@ -259,7 +347,7 @@ public class ManagerOfFiles implements IManagerOfFiles {
         managerOfThreads.safeAccept(callback, response);
     }
 
-    private void recursionScanning(File folder, List<ModelMediaFile> files, ModelFilters filters, ModelScanParams.StorageParams scanParams) {
+    private void storageRecursionScanning(File folder, List<ModelMediaFile> files, ModelFilters filters, ModelScanParams.StorageParams scanParams) {
 
         final int PATH_IS_NOT_TARGET = 0;
         final int PATH_IS_TARGET = 1;
@@ -314,11 +402,40 @@ public class ManagerOfFiles implements IManagerOfFiles {
 
         for (File file : folderFiles) {
             ModelMediaFile model = getFileInfo(file);
+            if (model == null) {
+                continue;
+            }
             if (file.isDirectory()) {
-                if (foldersFilter(file, model, filters, scanParams)) {
-                    recursionScanning(file, files, filters, scanParams);
+                if (foldersFilter(file, model, filters)) {
+                    storageRecursionScanning(file, files, filters, scanParams);
                 }
-            } else if (filesFilter(filters, file, model, scanParams)) {
+            } else if (filesFilter(filters, file, model)) {
+                files.add(model);
+            }
+        }
+    }
+
+    private void folderScanning(File folder, List<ModelMediaFile> files, ModelFilters filters) {
+        if (folder == null) {
+            return;
+        }
+
+        File[] folderFiles = folder.listFiles();
+
+        if (folderFiles == null || folderFiles.length == 0) {
+            return;
+        }
+
+        for (File file : folderFiles) {
+            ModelMediaFile model = getFileInfo(file);
+            if (model == null) {
+                continue;
+            }
+            if (file.isDirectory()) {
+                if (foldersFilter(file, model, filters)) {
+                    files.add(model);
+                }
+            } else if (filesFilter(filters, file, model)) {
                 files.add(model);
             }
         }
@@ -541,7 +658,7 @@ public class ManagerOfFiles implements IManagerOfFiles {
         );
     }
 
-    private boolean foldersFilter(File folder, ModelMediaFile model, ModelFilters filters, ModelScanParams.StorageParams scanParams) {
+    private boolean foldersFilter(File folder, ModelMediaFile model, ModelFilters filters) {
         if (model == null) {
             return false;
         }
@@ -555,7 +672,7 @@ public class ManagerOfFiles implements IManagerOfFiles {
         return true;
     }
 
-    private boolean filesFilter(ModelFilters filters, File file, ModelMediaFile model, ModelScanParams.StorageParams scanParams) {
+    private boolean filesFilter(ModelFilters filters, File file, ModelMediaFile model) {
         if (model == null) {
             return false;
         }

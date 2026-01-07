@@ -25,7 +25,6 @@ public class GridItemSquare extends GridItemBase {
 
     private static final String LOG_TAG = "GridItemSquare";
 
-    private ModelMediaFile model;
     private boolean isInfoHidden;
 
     private TextView infoView;
@@ -66,15 +65,6 @@ public class GridItemSquare extends GridItemBase {
         convert = new Convert(getContext());
     }
 
-    public ModelMediaFile getModel() {
-        return model;
-    }
-
-    public void setModel(ModelMediaFile model) {
-        this.model = model;
-        updateView();
-    }
-
     public boolean getIsInfoHidden() {
         return isInfoHidden;
     }
@@ -83,7 +73,8 @@ public class GridItemSquare extends GridItemBase {
         this.isInfoHidden = isInfoHidden;
     }
 
-    private void updateView() {
+    @Override
+    protected void updateView() {
         String info = null;
 
         try {

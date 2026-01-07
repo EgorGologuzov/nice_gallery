@@ -2,6 +2,7 @@ package com.nti.nice_gallery.fragments;
 
 import android.os.Bundle;
 
+import androidx.activity.OnBackPressedCallback;
 import androidx.fragment.app.Fragment;
 
 import android.view.LayoutInflater;
@@ -81,15 +82,11 @@ public class FragmentMediaAll extends Fragment {
 
     private void updateRequestSortVariant(ModelGetFilesRequest.SortVariant sortVariant) {
         if (request == null) {
-            request = new ModelGetFilesRequest(
-                    null,
-                    null,
-                    null,
-                    null
-            );
+            return;
         }
 
         request = new ModelGetFilesRequest(
+                request.path,
                 request.scanParams,
                 request.filters,
                 sortVariant,
@@ -191,6 +188,7 @@ public class FragmentMediaAll extends Fragment {
         );
 
         return new ModelGetFilesRequest(
+                null,
                 scanParams,
                 filters,
                 sortVariant,
