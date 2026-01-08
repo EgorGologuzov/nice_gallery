@@ -1,6 +1,7 @@
 package com.nti.nice_gallery.activities;
 
 import android.os.Bundle;
+import android.util.Log;
 import android.view.MenuItem;
 
 import androidx.activity.OnBackPressedCallback;
@@ -25,9 +26,13 @@ import kotlin.jvm.functions.Function2;
 
 public class ActivityMain extends AppCompatActivity {
 
+    private static final String LOG_TAG = "ActivityMain";
+
     private static final String TAG_MEDIA_ALL = "fragment_media_all";
     private static final String TAG_MEDIA_TREE = "fragment_media_tree";
     private static final String TAG_SETTINGS = "fragment_settings";
+
+    private static Integer menuSelectedItemId;
 
     private BottomNavigationView bottomNavigationView;
 
@@ -59,27 +64,58 @@ public class ActivityMain extends AppCompatActivity {
         fragmentSettings = (FragmentSettings) getSupportFragmentManager()
                 .findFragmentByTag(TAG_SETTINGS);
 
+        if (menuSelectedItemId != null) {
+            if (menuSelectedItemId == R.id.bottom_menu_button_all) {
+                currentFragment = fragmentMediaAll;
+            }
+            if (menuSelectedItemId == R.id.bottom_menu_button_folders) {
+                currentFragment = fragmentMediaTree;
+            }
+            if (menuSelectedItemId == R.id.bottom_menu_button_settings) {
+                currentFragment = fragmentSettings;
+            }
+        }
+
         backButtonPressedListeners = new HashMap<>();
         managerOfPermissions = new ManagerOfPermissions(this);
         managerOfThreads = new ManagerOfThreads(this);
 
-        Function2<Fragment, String, Integer> showFragment = (fragment, tag) -> {
+        Runnable showCurrentFragment = () -> {
+            if (currentFragment == null) {
+                return;
+            }
+
             FragmentTransaction transaction = getSupportFragmentManager().beginTransaction();
 
-            if (currentFragment != null) {
-                transaction.hide(currentFragment);
+            if (fragmentMediaAll != null && fragmentMediaAll != currentFragment) {
+                transaction.hide(fragmentMediaAll);
+            }
+            if (fragmentMediaTree != null && fragmentMediaTree != currentFragment) {
+                transaction.hide(fragmentMediaTree);
+            }
+            if (fragmentSettings != null && fragmentSettings != currentFragment) {
+                transaction.hide(fragmentSettings);
             }
 
-            if (fragment.isAdded()) {
-                transaction.show(fragment);
+            String currentFragmentTag = null;
+
+            if (currentFragment == fragmentMediaAll) {
+                currentFragmentTag = TAG_MEDIA_ALL;
+            }
+            if (currentFragment == fragmentMediaTree) {
+                currentFragmentTag = TAG_MEDIA_TREE;
+            }
+            if (currentFragment == fragmentSettings) {
+                currentFragmentTag = TAG_SETTINGS;
+            }
+
+            if (currentFragment.isAdded()) {
+                transaction.show(currentFragment);
             } else {
-                transaction.add(R.id.contentFrame, fragment, tag);
+                transaction.add(R.id.contentFrame, currentFragment, currentFragmentTag);
             }
 
-            currentFragment = fragment;
             transaction.commit();
-
-            return 0;
         };
 
         Function1<MenuItem, Boolean> onSelectedFragmentChange = menuItem -> {
@@ -89,19 +125,27 @@ public class ActivityMain extends AppCompatActivity {
                 if (fragmentMediaAll == null) {
                     fragmentMediaAll = new FragmentMediaAll();
                 }
-                showFragment.invoke(fragmentMediaAll, TAG_MEDIA_ALL);
+                currentFragment = fragmentMediaAll;
+                menuSelectedItemId = itemId;
+                showCurrentFragment.run();
                 return true;
-            } else if (itemId == R.id.bottom_menu_button_folders) {
+            }
+            if (itemId == R.id.bottom_menu_button_folders) {
                 if (fragmentMediaTree == null) {
                     fragmentMediaTree = new FragmentMediaTree();
                 }
-                showFragment.invoke(fragmentMediaTree, TAG_MEDIA_TREE);
+                currentFragment = fragmentMediaTree;
+                menuSelectedItemId = itemId;
+                showCurrentFragment.run();
                 return true;
-            } else if (itemId == R.id.bottom_menu_button_settings) {
+            }
+            if (itemId == R.id.bottom_menu_button_settings) {
                 if (fragmentSettings == null) {
                     fragmentSettings = new FragmentSettings();
                 }
-                showFragment.invoke(fragmentSettings, TAG_SETTINGS);
+                currentFragment = fragmentSettings;
+                menuSelectedItemId = itemId;
+                showCurrentFragment.run();
                 return true;
             }
 
@@ -109,7 +153,11 @@ public class ActivityMain extends AppCompatActivity {
         };
 
         Runnable onManageExternalStoragePermissionGranted = () -> {
-            bottomNavigationView.setSelectedItemId(R.id.bottom_menu_button_all);
+            if (currentFragment != null) {
+                showCurrentFragment.run();
+            } else {
+                bottomNavigationView.setSelectedItemId(R.id.bottom_menu_button_all);
+            }
         };
 
         Runnable onManageExternalStoragePermissionDenied = () -> {

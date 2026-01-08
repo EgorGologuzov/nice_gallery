@@ -43,12 +43,11 @@ public class ButtonPathsStack extends ButtonBase {
         setVisibility(GONE);
     }
 
-    public void setPathsStack(Collection<String> source) {
+    public void setPathsStack(ArrayList<String> source) {
         String pastTopPath = getTopPath();
-        pathsStack.clear();
 
         if (source != null && !source.isEmpty()) {
-            pathsStack.addAll(source);
+            pathsStack = source;
         }
 
         String currentTopPath = getTopPath();

@@ -4,6 +4,7 @@ import android.os.Bundle;
 
 import androidx.fragment.app.Fragment;
 
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -20,6 +21,7 @@ import com.nti.nice_gallery.models.ModelFilters;
 import com.nti.nice_gallery.models.ModelGetFilesRequest;
 import com.nti.nice_gallery.models.ModelMediaFile;
 import com.nti.nice_gallery.models.ModelScanParams;
+import com.nti.nice_gallery.utils.ManagerOfThreads;
 import com.nti.nice_gallery.utils.ReadOnlyList;
 import com.nti.nice_gallery.views.ViewActionBar;
 import com.nti.nice_gallery.views.ViewMediaGrid;
@@ -41,12 +43,13 @@ import java.util.function.Consumer;
 public class FragmentMediaTree extends Fragment {
 
     private static final String LOG_TAG = "FragmentMediaTree";
+    private static final String KEY_PATH_STACK = "pathStack";
 
     private static ArrayList<String> pathStack;
 
     private ModelGetFilesRequest request;
-
     private IManagerOfFiles managerOfFiles;
+    private ManagerOfThreads managerOfThreads;
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
@@ -69,6 +72,7 @@ public class FragmentMediaTree extends Fragment {
         }
 
         managerOfFiles = Domain.getManagerOfFiles(getContext());
+        managerOfThreads = new ManagerOfThreads(getContext());
 
         request = getTestRequest();
 
@@ -98,18 +102,15 @@ public class FragmentMediaTree extends Fragment {
         viewMediaGrid.setStateChangeListener(v -> viewActionBar.setIsEnabled(v.getState() == ViewMediaGrid.State.StandbyMode));
         viewMediaGrid.setItemClickListener(onGridItemClick);
 
-        buttonPathsStack.setPathsStack(pathStack);
         buttonPathsStack.setTopPathChangeListener(btn -> { updateRequestPath(btn.getTopPath()); refreshFilesList.run(); });
         buttonGridVariant.setVariantChangeListener(btn -> viewMediaGrid.setGridVariant(btn.getSelectedVariant()));
         buttonSortVariant.setVariantChangeListener(btn -> { updateRequestSortVariant(btn.getSelectedVariant()); refreshFilesList.run(); });
         buttonRefresh.setRefreshListener(refreshFilesList);
 
-        refreshFilesList.run();
+        buttonPathsStack.setPathsStack(pathStack);
 
         return view;
     }
-
-
 
     private void updateRequestPath(String newPath) {
         if (request == null) {
@@ -140,10 +141,6 @@ public class FragmentMediaTree extends Fragment {
     }
 
     private ModelGetFilesRequest getTestRequest() {
-
-//        String path = null;
-        String path = ManagerOfFiles.PATH_ROOT;
-//        String path = "/storage/emulated/0";
 
 //            ModelGetFilesRequest.SortVariant sortVariant = null;
         ModelGetFilesRequest.SortVariant sortVariant = ModelGetFilesRequest.SortVariant.ByCreateAtDesc;
@@ -238,7 +235,7 @@ public class FragmentMediaTree extends Fragment {
         );
 
         return new ModelGetFilesRequest(
-                path,
+                pathStack.get(pathStack.size() - 1),
                 scanParams,
                 filters,
                 sortVariant,
