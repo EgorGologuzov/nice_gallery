@@ -1,7 +1,6 @@
 package com.nti.nice_gallery.activities;
 
 import android.os.Bundle;
-import android.util.Log;
 import android.view.MenuItem;
 
 import androidx.activity.OnBackPressedCallback;
@@ -22,7 +21,6 @@ import java.util.HashMap;
 import java.util.function.Consumer;
 
 import kotlin.jvm.functions.Function1;
-import kotlin.jvm.functions.Function2;
 
 public class ActivityMain extends AppCompatActivity {
 
@@ -31,6 +29,8 @@ public class ActivityMain extends AppCompatActivity {
     private static final String TAG_MEDIA_ALL = "fragment_media_all";
     private static final String TAG_MEDIA_TREE = "fragment_media_tree";
     private static final String TAG_SETTINGS = "fragment_settings";
+
+    private static final int STARTUP_MENU_BUTTON_ID = R.id.bottom_menu_button_folders;
 
     private static Integer menuSelectedItemId;
 
@@ -156,7 +156,7 @@ public class ActivityMain extends AppCompatActivity {
             if (currentFragment != null) {
                 showCurrentFragment.run();
             } else {
-                bottomNavigationView.setSelectedItemId(R.id.bottom_menu_button_all);
+                bottomNavigationView.setSelectedItemId(STARTUP_MENU_BUTTON_ID);
             }
         };
 

@@ -281,28 +281,26 @@ public class ManagerOfFiles implements IManagerOfFiles {
             });
         };
 
-        Runnable scanByPath = () -> {
-            if (Objects.equals(requestFinal.path, PATH_ROOT)) {
+        Runnable scan = () -> {
+            if (requestFinal.path == null) {
+                scanByParams.run();
+            } else if (Objects.equals(requestFinal.path, PATH_ROOT)) {
                 returnStoragesList.run();
             } else {
                 returnFolderFilesList.run();
             }
         };
 
-        if (requestFinal.path == null) {
-            scanByParams.run();
-        } else {
-            scanByPath.run();
-        }
+        managerOfThreads.executeAsync(scan);
     }
 
     @Override
     public void getPreviewAsync(ModelGetPreviewRequest request, Consumer<ModelGetPreviewResponse> callback) {
 
-        final Size TARGET_PREVIEW_RESOLUTION = new Size(250, 250);
+        final Size DEFAULT_TARGET_PREVIEW_RESOLUTION = new Size(300, 300);
         final int VIDEO_PREVIEW_TIMING = 0;
 
-        final ModelGetPreviewRequest DEFAULT_REQUEST = new ModelGetPreviewRequest(null);
+        final ModelGetPreviewRequest DEFAULT_REQUEST = new ModelGetPreviewRequest(null, null, null);
         final ModelGetPreviewRequest requestFinal = request == null ? DEFAULT_REQUEST : request;
 
         if (requestFinal == DEFAULT_REQUEST) {
@@ -310,10 +308,16 @@ public class ManagerOfFiles implements IManagerOfFiles {
             return;
         }
 
+        Size targetPreviewResolution = null;
+        if (requestFinal.targetWidth != null && requestFinal.targetWidth > 0 && requestFinal.targetHeight != null && requestFinal.targetHeight > 0){
+            targetPreviewResolution = new Size(requestFinal.targetWidth, request.targetHeight);
+        }
+        final Size targetPreviewResolutionFinal = targetPreviewResolution == null ? DEFAULT_TARGET_PREVIEW_RESOLUTION : targetPreviewResolution;
+
         Function1<ModelMediaFile, Integer> calcInSampleSize = _item -> {
 
-            final int reqWidth = TARGET_PREVIEW_RESOLUTION.getWidth();
-            final int reqHeight = TARGET_PREVIEW_RESOLUTION.getHeight();
+            final int reqWidth = targetPreviewResolutionFinal.getWidth();
+            final int reqHeight = targetPreviewResolutionFinal.getHeight();
             int width = _item.width;
             int height = _item.height;
             int inSampleSize = 1;
@@ -355,28 +359,30 @@ public class ManagerOfFiles implements IManagerOfFiles {
                 return retriever.getScaledFrameAtTime(
                         VIDEO_PREVIEW_TIMING,
                         android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
-                        TARGET_PREVIEW_RESOLUTION.getWidth(),
-                        TARGET_PREVIEW_RESOLUTION.getHeight());
+                        targetPreviewResolutionFinal.getWidth(),
+                        targetPreviewResolutionFinal.getHeight());
             } catch (Exception e) {
                 Log.e(LOG_TAG + 4, e.getMessage());
                 return null;
             }
         };
 
-        Bitmap bitmap = null;
+        managerOfThreads.executeAsync(() -> {
+            Bitmap bitmap = null;
 
-        if (requestFinal.file.type == ModelMediaFile.Type.Image) {
-            bitmap = getImagePreview.invoke(requestFinal.file);
-        }
-        if (requestFinal.file.type == ModelMediaFile.Type.Video) {
-            bitmap = getVideoPreview.invoke(requestFinal.file);
-        }
+            if (requestFinal.file.isImage) {
+                bitmap = getImagePreview.invoke(requestFinal.file);
+            }
+            if (requestFinal.file.isVideo) {
+                bitmap = getVideoPreview.invoke(requestFinal.file);
+            }
 
-        ModelGetPreviewResponse response = new ModelGetPreviewResponse(
-                bitmap
-        );
+            ModelGetPreviewResponse response = new ModelGetPreviewResponse(
+                    bitmap
+            );
 
-        managerOfThreads.safeAccept(callback, response);
+            managerOfThreads.safeAccept(callback, response);
+        });
     }
 
     private void storageRecursionScanning(File folder, List<ModelMediaFile> files, ModelFilters filters, ModelScanParams.StorageParams scanParams) {

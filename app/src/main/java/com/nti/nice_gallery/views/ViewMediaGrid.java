@@ -25,8 +25,6 @@ import com.nti.nice_gallery.views.grid_items.GridItemQuilt;
 import com.nti.nice_gallery.views.grid_items.GridItemSquare;
 
 import java.util.ArrayList;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -328,7 +326,12 @@ public class ViewMediaGrid extends ScrollView {
                 }
 
                 for (int i = 0; i < rowWidths.size(); i++) {
-                    rowWidths.set(i, rowWidths.get(i) * maxHeight / rowHeights.get(i));
+                    float w1 = rowWidths.get(i);
+                    float h1 = rowHeights.get(i);
+                    float w2 = w1 * maxHeight / h1;
+                    float h2 = h1 * maxHeight / h1;
+                    rowWidths.set(i, w2);
+                    rowHeights.set(i, h2);
                 }
 
                 int displayWidthWithoutPaddings = displayWidth - convert.dpToPx(2 * CONTAINER_HORIZONTAL_PADDING_DP + 2 * rowItems.size() * ITEM_MARGIN_DP);
@@ -336,11 +339,16 @@ public class ViewMediaGrid extends ScrollView {
                 int itemMarginsPx = convert.dpToPx(2 * ITEM_MARGIN_DP);
 
                 for (int i = 0; i < rowWidths.size(); i++) {
-                    rowWidths.set(i, rowWidths.get(i) * displayWidthWithoutPaddings / sumWidth + itemMarginsPx);
+                    float w1 = rowWidths.get(i);
+                    float h1 = rowHeights.get(i);
+                    float w2 = w1 * displayWidthWithoutPaddings / sumWidth + itemMarginsPx;
+                    float h2 = h1 * displayWidthWithoutPaddings / sumWidth + itemMarginsPx;
+                    rowWidths.set(i, w2);
+                    rowHeights.set(i, h2);
                 }
 
                 for (int i = 0; i < rowWidths.size(); i++) {
-                    GridItemQuilt itemView = new GridItemQuilt(getContext(), rowWidths.get(i));
+                    GridItemQuilt itemView = new GridItemQuilt(getContext(), rowWidths.get(i), rowHeights.get(i));
                     itemView.setModel(rowItems.get(i));
                     rowLayout.addView(itemView);
                 }
@@ -371,8 +379,7 @@ public class ViewMediaGrid extends ScrollView {
         };
 
         Runnable renderOnePage = () -> {
-            ExecutorService executor = Executors.newSingleThreadExecutor();
-            executor.execute(() -> {
+            managerOfThreads.executeAsync(() -> {
                 LinearLayout pageContainer = null;
 
                 switch (gridVariant) {
@@ -386,12 +393,11 @@ public class ViewMediaGrid extends ScrollView {
 
                 final LinearLayout pageContainerFinal = pageContainer;
 
-                post(() -> {
+                managerOfThreads.runOnUiThread(() -> {
                     container.removeView(viewInfoFilesLoading);
                     container.addView(pageContainerFinal);
                     setState(State.StandbyMode);
                     checkIsContainerFullAndLoadNextIfNot.run();
-                    executor.shutdown();
                 });
             });
         };

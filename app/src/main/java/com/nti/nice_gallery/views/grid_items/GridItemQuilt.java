@@ -3,12 +3,14 @@ package com.nti.nice_gallery.views.grid_items;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.util.Log;
+import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.annotation.DrawableRes;
 import androidx.annotation.NonNull;
+import androidx.constraintlayout.widget.ConstraintLayout;
 
 import com.nti.nice_gallery.R;
 import com.nti.nice_gallery.data.Domain;
@@ -16,6 +18,7 @@ import com.nti.nice_gallery.data.IManagerOfFiles;
 import com.nti.nice_gallery.models.ModelGetPreviewRequest;
 import com.nti.nice_gallery.models.ModelMediaFile;
 import com.nti.nice_gallery.utils.Convert;
+import com.nti.nice_gallery.utils.ManagerOfThreads;
 
 import java.util.ArrayList;
 
@@ -27,22 +30,25 @@ public class GridItemQuilt extends GridItemBase {
     private ImageView imageView;
 
     private IManagerOfFiles managerOfFiles;
+    private ManagerOfThreads managerOfThreads;
     private Convert convert;
 
-    public GridItemQuilt(@NonNull Context context, float weight) {
+    public GridItemQuilt(@NonNull Context context, float width, float height) {
         super(context);
-        init(weight);
+        init(width, height);
     }
 
-    private void init(float weight) {
-        LinearLayout.LayoutParams layoutParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT);
-        layoutParams.weight = weight;
+    private void init(float width, float height) {
+        LinearLayout.LayoutParams layoutParams = new LinearLayout.LayoutParams(0, (int) Math.floor(height));
+        layoutParams.weight = width;
         setLayoutParams(layoutParams);
         inflate(getContext(), R.layout.grid_item_quilt, this);
 
         infoView = findViewById(R.id.infoView);
         imageView = findViewById(R.id.imageView);
+
         managerOfFiles = Domain.getManagerOfFiles(getContext());
+        managerOfThreads = new ManagerOfThreads(getContext());
         convert = new Convert(getContext());
     }
 
@@ -77,21 +83,23 @@ public class GridItemQuilt extends GridItemBase {
         } else if (model.isStorage) {
             imageView.setImageResource(R.drawable.baseline_storage_24);
         } else {
-            try {
+            imageView.post(() -> {
                 ModelGetPreviewRequest previewRequest = new ModelGetPreviewRequest(
-                        model
+                        model,
+                        imageView.getWidth(),
+                        imageView.getHeight()
                 );
 
                 managerOfFiles.getPreviewAsync(previewRequest, response -> {
-                    if (response != null && response.preview != null) {
-                        post(() -> imageView.setImageBitmap(response.preview));
-                    } else {
-                        post(() -> imageView.setImageResource(R.drawable.baseline_error_24_orange_700));
-                    }
+                    managerOfThreads.runOnUiThread(() -> {
+                        if (response != null && response.preview != null) {
+                            imageView.setImageBitmap(response.preview);
+                        } else {
+                            imageView.setImageResource(R.drawable.baseline_error_24_orange_700);
+                        }
+                    });
                 });
-            } catch (Exception e) {
-                imageView.setImageResource(R.drawable.baseline_error_24_orange_700);
-            }
+            });
         }
     }
 }

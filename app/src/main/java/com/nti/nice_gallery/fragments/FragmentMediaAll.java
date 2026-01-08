@@ -2,7 +2,6 @@ package com.nti.nice_gallery.fragments;
 
 import android.os.Bundle;
 
-import androidx.activity.OnBackPressedCallback;
 import androidx.fragment.app.Fragment;
 
 import android.view.LayoutInflater;
@@ -18,6 +17,7 @@ import com.nti.nice_gallery.models.ModelFilters;
 import com.nti.nice_gallery.models.ModelGetFilesRequest;
 import com.nti.nice_gallery.models.ModelMediaFile;
 import com.nti.nice_gallery.models.ModelScanParams;
+import com.nti.nice_gallery.utils.ManagerOfThreads;
 import com.nti.nice_gallery.utils.ReadOnlyList;
 import com.nti.nice_gallery.views.ViewActionBar;
 import com.nti.nice_gallery.views.ViewMediaGrid;
@@ -30,14 +30,13 @@ import com.nti.nice_gallery.views.buttons.ButtonScanningReport;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 public class FragmentMediaAll extends Fragment {
 
     private ModelGetFilesRequest request;
 
     private IManagerOfFiles managerOfFiles;
+    private ManagerOfThreads managerOfThreads;
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
@@ -52,20 +51,17 @@ public class FragmentMediaAll extends Fragment {
         ButtonScanningReport buttonScanningReport = view.findViewById(R.id.buttonScanningReport);
 
         managerOfFiles = Domain.getManagerOfFiles(getContext());
+        managerOfThreads = new ManagerOfThreads(getContext());
 
         request = getTestRequest();
 
         Runnable requestFiles = () -> {
             viewMediaGrid.trySetStateScanningInProgress(true);
-            ExecutorService executor = Executors.newSingleThreadExecutor();
-            executor.execute(() -> {
-                managerOfFiles.getFilesAsync(request, response -> {
-                    getActivity().runOnUiThread(() -> {
-                        viewMediaGrid.setItems(response.files);
-                        viewMediaGrid.trySetStateScanningInProgress(false);
-                        buttonScanningReport.setSource(response);
-                        executor.shutdown();
-                    });
+            managerOfFiles.getFilesAsync(request, response -> {
+                managerOfThreads.runOnUiThread(() -> {
+                    viewMediaGrid.setItems(response.files);
+                    viewMediaGrid.trySetStateScanningInProgress(false);
+                    buttonScanningReport.setSource(response);
                 });
             });
         };
@@ -146,41 +142,18 @@ public class FragmentMediaAll extends Fragment {
 
         List<ModelScanParams.StorageParams> storagesParams = new ArrayList<>();
 //            storagesParams.add(new ModelScanParams.StorageParams(
-//                    "Память устройства [/storage/emulated/0]",
+//                    "[/storage/emulated/0]",
 //                    ModelScanParams.ScanMode.ScanPathsInListOnly,
 //                    new ReadOnlyList<>(new String[] {
-//                            "/storage/emulated/0/Download",
-//                            "/storage/emulated/0/Movies/AzScreenRecorder"
+//                            "/storage/emulated/0/nice_gallery_test",
 //                    })
 //            ));
 //            storagesParams.add(new ModelScanParams.StorageParams(
-//                    "Память устройства [/storage/emulated/0]",
-//                    ModelScanParams.ScanMode.ScanPathsNotInListOnly,
+//                    "[/storage/72AD-2013]",
+//                    ModelScanParams.ScanMode.ScanPathsInListOnly,
 //                    new ReadOnlyList<>(new String[] {
-//                            "/storage/emulated/0/Download",
-//                            "/storage/emulated/0/Movies/AzScreenRecorder"
+//                            "/storage/72AD-2013/nice_gallery_test",
 //                    })
-//            ));
-//            storagesParams.add(new ModelScanParams.StorageParams(
-//                    "Память устройства [/storage/emulated/0]",
-//                    ModelScanParams.ScanMode.IgnoreStorage,
-//                    new ReadOnlyList<>(new String[] {
-//                            "/storage/emulated/0/Download",
-//                            "/storage/emulated/0/Movies/AzScreenRecorder"
-//                    })
-//            ));
-//            storagesParams.add(new ModelScanParams.StorageParams(
-//                    "Память устройства [/storage/emulated/0]",
-//                    ModelScanParams.ScanMode.ScanAll,
-//                    new ReadOnlyList<>(new String[] {
-//                            "/storage/emulated/0/Download",
-//                            "/storage/emulated/0/Movies/AzScreenRecorder"
-//                    })
-//            ));
-//            storagesParams.add(new ModelScanParams.StorageParams(
-//                    "Карта памяти [/storage/72AD-2013]",
-//                    ModelScanParams.ScanMode.IgnoreStorage,
-//                    null
 //            ));
 
         ModelScanParams scanParams = new ModelScanParams(

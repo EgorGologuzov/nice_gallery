@@ -36,8 +36,6 @@ import com.nti.nice_gallery.views.grid_items.GridItemBase;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 
 public class FragmentMediaTree extends Fragment {
@@ -78,15 +76,11 @@ public class FragmentMediaTree extends Fragment {
 
         Runnable refreshFilesList = () -> {
             viewMediaGrid.trySetStateScanningInProgress(true);
-            ExecutorService executor = Executors.newSingleThreadExecutor();
-            executor.execute(() -> {
-                managerOfFiles.getFilesAsync(request, response -> {
-                    getActivity().runOnUiThread(() -> {
-                        viewMediaGrid.setItems(response.files);
-                        viewMediaGrid.trySetStateScanningInProgress(false);
-                        buttonScanningReport.setSource(response);
-                        executor.shutdown();
-                    });
+            managerOfFiles.getFilesAsync(request, response -> {
+                managerOfThreads.runOnUiThread(() -> {
+                    viewMediaGrid.setItems(response.files);
+                    viewMediaGrid.trySetStateScanningInProgress(false);
+                    buttonScanningReport.setSource(response);
                 });
             });
         };
