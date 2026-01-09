@@ -57,6 +57,11 @@ public class ButtonScanningReport extends ButtonBase {
             addLine.invoke("Длилось: " + ChronoUnit.MILLIS.between(source.scanningStartedAt, source.scanningFinishedAt) / 1000f + " сек. (начато: " + source.scanningStartedAt + ")");
             addLine.invoke("");
 
+            if (source.error != null) {
+                addLine.invoke("При сканировании произошла ошибка: " + source.error.getMessage());
+                return builder.toString();
+            }
+
             if (source.scannedStorages != null && !source.scannedStorages.isEmpty()) {
                 addLine.invoke("Найдено хранилищ (" + source.scannedStorages.size() + "):");
                 addLine.invoke("");

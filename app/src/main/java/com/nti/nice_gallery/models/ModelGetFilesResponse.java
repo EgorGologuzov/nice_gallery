@@ -14,7 +14,10 @@ public class ModelGetFilesResponse {
     public final ReadOnlyList<ModelStorage> scannedStorages;
     public final ReadOnlyList<ModelMediaFile> filesWithErrors;
     public final ReadOnlyList<ModelStorage> storagesWithErrors;
+
     @Nullable public final String path;
+
+    @Nullable public final Exception error;
 
     public ModelGetFilesResponse(
             LocalDateTime scanningStartedAt,
@@ -23,7 +26,8 @@ public class ModelGetFilesResponse {
             ReadOnlyList<ModelStorage> scannedStorages,
             ReadOnlyList<ModelMediaFile> filesWithErrors,
             ReadOnlyList<ModelStorage> storagesWithErrors,
-            @Nullable String path
+            @Nullable String path,
+            @Nullable Exception error
     ) {
         this.scanningStartedAt = scanningStartedAt;
         this.scanningFinishedAt = scanningFinishedAt;
@@ -32,5 +36,6 @@ public class ModelGetFilesResponse {
         this.filesWithErrors = filesWithErrors;
         this.storagesWithErrors = storagesWithErrors;
         this.path = path;
+        this.error = error;
     }
 }

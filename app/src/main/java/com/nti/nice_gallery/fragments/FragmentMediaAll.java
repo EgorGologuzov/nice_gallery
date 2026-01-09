@@ -13,10 +13,12 @@ import androidx.annotation.Nullable;
 import com.nti.nice_gallery.R;
 import com.nti.nice_gallery.data.Domain;
 import com.nti.nice_gallery.data.IManagerOfFiles;
+import com.nti.nice_gallery.data.ManagerOfFiles;
 import com.nti.nice_gallery.models.ModelFilters;
 import com.nti.nice_gallery.models.ModelGetFilesRequest;
 import com.nti.nice_gallery.models.ModelMediaFile;
 import com.nti.nice_gallery.models.ModelScanParams;
+import com.nti.nice_gallery.utils.ManagerOfDialogs;
 import com.nti.nice_gallery.utils.ManagerOfThreads;
 import com.nti.nice_gallery.utils.ReadOnlyList;
 import com.nti.nice_gallery.views.ViewActionBar;
@@ -30,13 +32,11 @@ import com.nti.nice_gallery.views.buttons.ButtonScanningReport;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 
 public class FragmentMediaAll extends Fragment {
 
     private ModelGetFilesRequest request;
-
-    private IManagerOfFiles managerOfFiles;
-    private ManagerOfThreads managerOfThreads;
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
@@ -50,44 +50,62 @@ public class FragmentMediaAll extends Fragment {
         ButtonRefresh buttonRefresh = view.findViewById(R.id.buttonRefresh);
         ButtonScanningReport buttonScanningReport = view.findViewById(R.id.buttonScanningReport);
 
-        managerOfFiles = Domain.getManagerOfFiles(getContext());
-        managerOfThreads = new ManagerOfThreads(getContext());
+        IManagerOfFiles managerOfFiles = Domain.getManagerOfFiles(getContext());
+        ManagerOfThreads managerOfThreads = new ManagerOfThreads(getContext());
+        ManagerOfDialogs managerOfDialogs = new ManagerOfDialogs(getContext());
 
         request = getTestRequest();
 
-        Runnable requestFiles = () -> {
+        Consumer<ModelGetFilesRequest.SortVariant> updateRequestSortVariant = newSortVariant -> {
+            if (request == null) {
+                return;
+            }
+
+            request = new ModelGetFilesRequest(
+                    request.path,
+                    request.scanParams,
+                    request.filters,
+                    newSortVariant,
+                    request.foldersFirst
+            );
+        };
+
+        Runnable refreshFilesList = () -> {
             viewMediaGrid.trySetStateScanningInProgress(true);
             managerOfFiles.getFilesAsync(request, response -> {
                 managerOfThreads.runOnUiThread(() -> {
-                    viewMediaGrid.setItems(response.files);
-                    viewMediaGrid.trySetStateScanningInProgress(false);
-                    buttonScanningReport.setSource(response);
+                    if (response.error == null) {
+                        viewMediaGrid.setItems(response.files);
+                        viewMediaGrid.trySetStateScanningInProgress(false);
+                        buttonScanningReport.setSource(response);
+                    } else {
+                        managerOfDialogs.showInfo(R.string.dialog_title_something_wrong, R.string.message_error_scanning_failed);
+                    }
                 });
             });
         };
 
-        viewMediaGrid.setStateChangeListener(v -> viewActionBar.setIsEnabled(v.getState() == ViewMediaGrid.State.StandbyMode));
-        buttonGridVariant.setVariantChangeListener(btn -> viewMediaGrid.setGridVariant(btn.getSelectedVariant()));
-        buttonSortVariant.setVariantChangeListener(btn -> { updateRequestSortVariant(btn.getSelectedVariant()); requestFiles.run(); });
-        buttonRefresh.setRefreshListener(requestFiles);
+        Consumer<ViewMediaGrid> onViewMediaGridStateChangeListener = v -> {
+            viewActionBar.setIsEnabled(v.getState() == ViewMediaGrid.State.StandbyMode);
+        };
 
-        requestFiles.run();
+        Consumer<ButtonChoiceGridVariant> onGridVariantChange = btn -> {
+            viewMediaGrid.setGridVariant(btn.getSelectedVariant());
+        };
+
+        Consumer<ButtonChoiceSortVariant> onSortVariantChange = btn -> {
+            updateRequestSortVariant.accept(btn.getSelectedVariant());
+            refreshFilesList.run();
+        };
+
+        viewMediaGrid.setStateChangeListener(onViewMediaGridStateChangeListener);
+        buttonGridVariant.setVariantChangeListener(onGridVariantChange);
+        buttonSortVariant.setVariantChangeListener(onSortVariantChange);
+        buttonRefresh.setRefreshListener(refreshFilesList);
+
+        refreshFilesList.run();
 
         return view;
-    }
-
-    private void updateRequestSortVariant(ModelGetFilesRequest.SortVariant sortVariant) {
-        if (request == null) {
-            return;
-        }
-
-        request = new ModelGetFilesRequest(
-                request.path,
-                request.scanParams,
-                request.filters,
-                sortVariant,
-                request.foldersFirst
-        );
     }
 
     private ModelGetFilesRequest getTestRequest() {

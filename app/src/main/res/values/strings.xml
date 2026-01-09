@@ -42,12 +42,14 @@
     <string name="message_scanning_report_source_not_set">Не установлен источник данных</string>
     <!--Errors-->
     <string name="message_error_load_file_info_failed">Ошибка загрузки информации о файле</string>
+    <string name="message_error_scanning_failed">Ошибка при сканировании</string>
 
 <!--Dialogs-->
     <string name="dialog_title_permission_required">Необходимо разрешение</string>
     <string name="dialog_title_scanning_report">Отчет о сканировании</string>
     <string name="dialog_title_grid_variant">Вариант сетки</string>
     <string name="dialog_title_sort_variant">Вариант сортировки</string>
+    <string name="dialog_title_something_wrong">Что-то пошло не так</string>
     <string name="dialog_button_ok">ОК</string>
     <string name="dialog_button_yes">Да</string>
     <string name="dialog_button_no">Нет</string>

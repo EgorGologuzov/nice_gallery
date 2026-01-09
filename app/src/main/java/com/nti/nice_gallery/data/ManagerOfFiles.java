@@ -170,32 +170,35 @@ public class ManagerOfFiles implements IManagerOfFiles {
                 final List<ModelMediaFile> filesWithErrors = new ArrayList<>();
 
                 for (ModelStorage storage : getStoragesResponse.storages) {
+                    try {
+                        File storageRoot = new File(storage.path);
+                        String[] storageChildren = storageRoot.list();
+                        int childElementsCount = 0;
 
-                    File storageRoot = new File(storage.path);
-                    String[] storageChildren = storageRoot.list();
-                    int childElementsCount = 0;
+                        if (storageChildren != null) {
+                            childElementsCount = storageChildren.length;
+                        }
 
-                    if (storageChildren != null) {
-                        childElementsCount = storageChildren.length;
+                        files.add(new ModelMediaFile(
+                                storage.description,
+                                storage.path,
+                                ModelMediaFile.Type.Storage,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                childElementsCount,
+                                storage.freeSpace,
+                                storage.totalSpace,
+                                null
+                        ));
+                    } catch (Exception e) {
+                        Log.e(LOG_TAG + 2.2, e.getMessage());
                     }
-
-                    files.add(new ModelMediaFile(
-                            storage.description,
-                            storage.path,
-                            ModelMediaFile.Type.Storage,
-                            null,
-                            null,
-                            null,
-                            null,
-                            null,
-                            null,
-                            null,
-                            null,
-                            childElementsCount,
-                            storage.freeSpace,
-                            storage.totalSpace,
-                            null
-                    ));
                 }
 
                 final List<ModelMediaFile> sortedFiles = sortFiles(files, requestFinal.sortVariant, requestFinal.foldersFirst);
@@ -207,7 +210,8 @@ public class ManagerOfFiles implements IManagerOfFiles {
                         getStoragesResponse.storages,
                         new ReadOnlyList<>(filesWithErrors),
                         new ReadOnlyList<>(storagesWithErrors),
-                        requestFinal.path
+                        requestFinal.path,
+                        null
                 );
 
                 managerOfThreads.safeAccept(callback, getFilesResponse);
@@ -237,7 +241,8 @@ public class ManagerOfFiles implements IManagerOfFiles {
                     new ReadOnlyList<>(new ArrayList<>()),
                     new ReadOnlyList<>(filesWithErrors),
                     new ReadOnlyList<>(new ArrayList<>()),
-                    requestFinal.path
+                    requestFinal.path,
+                    null
             );
 
             managerOfThreads.safeAccept(callback, getFilesResponse);
@@ -274,6 +279,7 @@ public class ManagerOfFiles implements IManagerOfFiles {
                         getStoragesResponse.storages,
                         new ReadOnlyList<>(filesWithErrors),
                         new ReadOnlyList<>(storagesWithErrors),
+                        null,
                         null
                 );
 
@@ -282,12 +288,31 @@ public class ManagerOfFiles implements IManagerOfFiles {
         };
 
         Runnable scan = () -> {
-            if (requestFinal.path == null) {
-                scanByParams.run();
-            } else if (Objects.equals(requestFinal.path, PATH_ROOT)) {
-                returnStoragesList.run();
-            } else {
-                returnFolderFilesList.run();
+            final LocalDateTime startedAt = LocalDateTime.now();
+
+            try {
+                if (requestFinal.path == null) {
+                    scanByParams.run();
+                } else if (Objects.equals(requestFinal.path, PATH_ROOT)) {
+                    returnStoragesList.run();
+                } else {
+                    returnFolderFilesList.run();
+                }
+            } catch (Exception e) {
+                Log.e(LOG_TAG + 2.1, e.getMessage());
+
+                ModelGetFilesResponse getFilesResponse = new ModelGetFilesResponse(
+                        startedAt,
+                        LocalDateTime.now(),
+                        null,
+                        null,
+                        null,
+                        null,
+                        requestFinal.path,
+                        e
+                );
+
+                managerOfThreads.safeAccept(callback, getFilesResponse);
             }
         };
 
@@ -367,14 +392,18 @@ public class ManagerOfFiles implements IManagerOfFiles {
             }
         };
 
-        managerOfThreads.executeAsync(() -> {
+        Runnable loadPreview = () -> {
             Bitmap bitmap = null;
 
-            if (requestFinal.file.isImage) {
-                bitmap = getImagePreview.invoke(requestFinal.file);
-            }
-            if (requestFinal.file.isVideo) {
-                bitmap = getVideoPreview.invoke(requestFinal.file);
+            try {
+                if (requestFinal.file.isImage) {
+                    bitmap = getImagePreview.invoke(requestFinal.file);
+                }
+                if (requestFinal.file.isVideo) {
+                    bitmap = getVideoPreview.invoke(requestFinal.file);
+                }
+            } catch (Exception e) {
+                Log.e(LOG_TAG + 4.1, e.getMessage());
             }
 
             ModelGetPreviewResponse response = new ModelGetPreviewResponse(
@@ -382,7 +411,9 @@ public class ManagerOfFiles implements IManagerOfFiles {
             );
 
             managerOfThreads.safeAccept(callback, response);
-        });
+        };
+
+        managerOfThreads.executeAsync(loadPreview);
     }
 
     private void storageRecursionScanning(File folder, List<ModelMediaFile> files, ModelFilters filters, ModelScanParams.StorageParams scanParams) {
@@ -494,9 +525,9 @@ public class ManagerOfFiles implements IManagerOfFiles {
             public int duration;
         }
 
-        Function1<File, LocalDateTime> getFileCreationTime = _file -> {
+        Function2<File, ModelMediaFile.Type, LocalDateTime> getFileCreationTime = (_file, type) -> {
             try {
-                if (!_file.isDirectory()) {
+                if (type == ModelMediaFile.Type.Image) {
                     ExifInterface exif = new ExifInterface(_file.getAbsolutePath());
                     String dateString = exif.getAttribute(ExifInterface.TAG_DATETIME_ORIGINAL);
 
@@ -654,7 +685,7 @@ public class ManagerOfFiles implements IManagerOfFiles {
             if (type == null) return null;
 
             path = file.getAbsolutePath();
-            createAt = getFileCreationTime.invoke(file);
+            createAt = getFileCreationTime.invoke(file, type);
             updateAt = Instant.ofEpochMilli(file.lastModified()).atZone(ZoneId.systemDefault()).toLocalDateTime();
 
             if (type != ModelMediaFile.Type.Folder) {

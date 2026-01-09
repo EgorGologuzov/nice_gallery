@@ -21,6 +21,7 @@ import com.nti.nice_gallery.models.ModelFilters;
 import com.nti.nice_gallery.models.ModelGetFilesRequest;
 import com.nti.nice_gallery.models.ModelMediaFile;
 import com.nti.nice_gallery.models.ModelScanParams;
+import com.nti.nice_gallery.utils.ManagerOfDialogs;
 import com.nti.nice_gallery.utils.ManagerOfThreads;
 import com.nti.nice_gallery.utils.ReadOnlyList;
 import com.nti.nice_gallery.views.ViewActionBar;
@@ -38,16 +39,15 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 
+import kotlin.jvm.functions.Function1;
+
 public class FragmentMediaTree extends Fragment {
 
     private static final String LOG_TAG = "FragmentMediaTree";
-    private static final String KEY_PATH_STACK = "pathStack";
 
     private static ArrayList<String> pathStack;
 
     private ModelGetFilesRequest request;
-    private IManagerOfFiles managerOfFiles;
-    private ManagerOfThreads managerOfThreads;
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
@@ -64,23 +64,56 @@ public class FragmentMediaTree extends Fragment {
         ButtonRefresh buttonRefresh = view.findViewById(R.id.buttonRefresh);
         ButtonScanningReport buttonScanningReport = view.findViewById(R.id.buttonScanningReport);
 
+        IManagerOfFiles managerOfFiles = Domain.getManagerOfFiles(getContext());
+        ManagerOfThreads managerOfThreads = new ManagerOfThreads(getContext());
+        ManagerOfDialogs managerOfDialogs = new ManagerOfDialogs(getContext());
+
         if (pathStack == null) {
             pathStack = new ArrayList<>();
             pathStack.add(ManagerOfFiles.PATH_ROOT);
         }
 
-        managerOfFiles = Domain.getManagerOfFiles(getContext());
-        managerOfThreads = new ManagerOfThreads(getContext());
-
         request = getTestRequest();
+
+        Consumer<ModelGetFilesRequest.SortVariant> updateRequestSortVariant = newSortVariant -> {
+            if (request == null) {
+                return;
+            }
+
+            request = new ModelGetFilesRequest(
+                    request.path,
+                    request.scanParams,
+                    request.filters,
+                    newSortVariant,
+                    request.foldersFirst
+            );
+        };
+
+        Consumer<String> updateRequestPath = newPath -> {
+            if (request == null) {
+                return;
+            }
+
+            request = new ModelGetFilesRequest(
+                    newPath,
+                    request.scanParams,
+                    request.filters,
+                    request.sortVariant,
+                    request.foldersFirst
+            );
+        };
 
         Runnable refreshFilesList = () -> {
             viewMediaGrid.trySetStateScanningInProgress(true);
             managerOfFiles.getFilesAsync(request, response -> {
                 managerOfThreads.runOnUiThread(() -> {
-                    viewMediaGrid.setItems(response.files);
-                    viewMediaGrid.trySetStateScanningInProgress(false);
-                    buttonScanningReport.setSource(response);
+                    if (response.error == null) {
+                        viewMediaGrid.setItems(response.files);
+                        viewMediaGrid.trySetStateScanningInProgress(false);
+                        buttonScanningReport.setSource(response);
+                    } else {
+                        managerOfDialogs.showInfo(R.string.dialog_title_something_wrong, R.string.message_error_scanning_failed);
+                    }
                 });
             });
         };
@@ -91,47 +124,41 @@ public class FragmentMediaTree extends Fragment {
             }
         };
 
-        activityMain.setBackButtonPressedListener(this, activity -> buttonPathsStack.removeTopItem());
+        Consumer<ActivityMain> onBackButtonPressed = a -> {
+            buttonPathsStack.removeTopItem();
+        };
 
-        viewMediaGrid.setStateChangeListener(v -> viewActionBar.setIsEnabled(v.getState() == ViewMediaGrid.State.StandbyMode));
+        Consumer<ViewMediaGrid> onViewMediaGridStateChangeListener = v -> {
+            viewActionBar.setIsEnabled(v.getState() == ViewMediaGrid.State.StandbyMode);
+        };
+
+        Consumer<ButtonPathsStack> onCurrentPathChange = btn -> {
+            updateRequestPath.accept(btn.getTopPath());
+            refreshFilesList.run();
+        };
+
+        Consumer<ButtonChoiceGridVariant> onGridVariantChange = btn -> {
+            viewMediaGrid.setGridVariant(btn.getSelectedVariant());
+        };
+
+        Consumer<ButtonChoiceSortVariant> onSortVariantChange = btn -> {
+            updateRequestSortVariant.accept(btn.getSelectedVariant());
+            refreshFilesList.run();
+        };
+
+        activityMain.setBackButtonPressedListener(this, onBackButtonPressed);
+
+        viewMediaGrid.setStateChangeListener(onViewMediaGridStateChangeListener);
         viewMediaGrid.setItemClickListener(onGridItemClick);
 
-        buttonPathsStack.setTopPathChangeListener(btn -> { updateRequestPath(btn.getTopPath()); refreshFilesList.run(); });
-        buttonGridVariant.setVariantChangeListener(btn -> viewMediaGrid.setGridVariant(btn.getSelectedVariant()));
-        buttonSortVariant.setVariantChangeListener(btn -> { updateRequestSortVariant(btn.getSelectedVariant()); refreshFilesList.run(); });
+        buttonPathsStack.setTopPathChangeListener(onCurrentPathChange);
+        buttonGridVariant.setVariantChangeListener(onGridVariantChange);
+        buttonSortVariant.setVariantChangeListener(onSortVariantChange);
         buttonRefresh.setRefreshListener(refreshFilesList);
 
         buttonPathsStack.setPathsStack(pathStack);
 
         return view;
-    }
-
-    private void updateRequestPath(String newPath) {
-        if (request == null) {
-            return;
-        }
-
-        request = new ModelGetFilesRequest(
-                newPath,
-                request.scanParams,
-                request.filters,
-                request.sortVariant,
-                request.foldersFirst
-        );
-    }
-
-    private void updateRequestSortVariant(ModelGetFilesRequest.SortVariant newSortVariant) {
-        if (request == null) {
-            return;
-        }
-
-        request = new ModelGetFilesRequest(
-                request.path,
-                request.scanParams,
-                request.filters,
-                newSortVariant,
-                request.foldersFirst
-        );
     }
 
     private ModelGetFilesRequest getTestRequest() {
