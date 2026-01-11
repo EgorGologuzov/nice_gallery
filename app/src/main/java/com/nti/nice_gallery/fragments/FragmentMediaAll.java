@@ -79,6 +79,7 @@ public class FragmentMediaAll extends Fragment {
                         viewMediaGrid.trySetStateScanningInProgress(false);
                         buttonScanningReport.setSource(response);
                     } else {
+                        viewMediaGrid.trySetStateScanningInProgress(false);
                         managerOfDialogs.showInfo(R.string.dialog_title_something_wrong, R.string.message_error_scanning_failed);
                     }
                 });

@@ -39,7 +39,7 @@ public class ButtonChoiceFilters extends ButtonBase {
     }
 
     private void onClick() {
-        managerOfNavigation.navigate((Activity)getContext(), ActivityFilters.class);
+        managerOfNavigation.navigate(ActivityFilters.class, null);
 
 //        areFiltersSet = !areFiltersSet;
 //        if (areFiltersSet) {

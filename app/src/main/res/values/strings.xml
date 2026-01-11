@@ -43,6 +43,7 @@
     <!--Errors-->
     <string name="message_error_load_file_info_failed">Ошибка загрузки информации о файле</string>
     <string name="message_error_scanning_failed">Ошибка при сканировании</string>
+    <string name="message_error_video_playing_failed">Ошибка при воспроизведении видео</string>
 
 <!--Dialogs-->
     <string name="dialog_title_permission_required">Необходимо разрешение</string>

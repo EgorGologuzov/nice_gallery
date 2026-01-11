@@ -14,14 +14,17 @@ import androidx.annotation.Nullable;
 
 import com.nti.nice_gallery.R;
 import com.nti.nice_gallery.activities.ActivityMain;
+import com.nti.nice_gallery.activities.ActivityMediaView;
 import com.nti.nice_gallery.data.Domain;
 import com.nti.nice_gallery.data.IManagerOfFiles;
 import com.nti.nice_gallery.data.ManagerOfFiles;
 import com.nti.nice_gallery.models.ModelFilters;
 import com.nti.nice_gallery.models.ModelGetFilesRequest;
+import com.nti.nice_gallery.models.ModelGetFilesResponse;
 import com.nti.nice_gallery.models.ModelMediaFile;
 import com.nti.nice_gallery.models.ModelScanParams;
 import com.nti.nice_gallery.utils.ManagerOfDialogs;
+import com.nti.nice_gallery.utils.ManagerOfNavigation;
 import com.nti.nice_gallery.utils.ManagerOfThreads;
 import com.nti.nice_gallery.utils.ReadOnlyList;
 import com.nti.nice_gallery.views.ViewActionBar;
@@ -48,6 +51,7 @@ public class FragmentMediaTree extends Fragment {
     private static ArrayList<String> pathStack;
 
     private ModelGetFilesRequest request;
+    private ModelGetFilesResponse response;
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
@@ -67,6 +71,7 @@ public class FragmentMediaTree extends Fragment {
         IManagerOfFiles managerOfFiles = Domain.getManagerOfFiles(getContext());
         ManagerOfThreads managerOfThreads = new ManagerOfThreads(getContext());
         ManagerOfDialogs managerOfDialogs = new ManagerOfDialogs(getContext());
+        ManagerOfNavigation managerOfNavigation = new ManagerOfNavigation(getContext());
 
         if (pathStack == null) {
             pathStack = new ArrayList<>();
@@ -107,11 +112,13 @@ public class FragmentMediaTree extends Fragment {
             viewMediaGrid.trySetStateScanningInProgress(true);
             managerOfFiles.getFilesAsync(request, response -> {
                 managerOfThreads.runOnUiThread(() -> {
+                    FragmentMediaTree.this.response = response;
                     if (response.error == null) {
                         viewMediaGrid.setItems(response.files);
                         viewMediaGrid.trySetStateScanningInProgress(false);
                         buttonScanningReport.setSource(response);
                     } else {
+                        viewMediaGrid.trySetStateScanningInProgress(false);
                         managerOfDialogs.showInfo(R.string.dialog_title_something_wrong, R.string.message_error_scanning_failed);
                     }
                 });
@@ -119,8 +126,19 @@ public class FragmentMediaTree extends Fragment {
         };
 
         Consumer<GridItemBase> onGridItemClick = item -> {
-            if (item.getModel().isDirectory) {
+            ModelMediaFile file = item.getModel();
+
+            if (file.isDirectory) {
                 buttonPathsStack.addTopItem(item.getModel().path);
+            }
+
+            if (file.isFile) {
+                ActivityMediaView.Payload payload = new ActivityMediaView.Payload(
+                        response,
+                        file
+                );
+
+                managerOfNavigation.navigate(ActivityMediaView.class, payload);
             }
         };
 

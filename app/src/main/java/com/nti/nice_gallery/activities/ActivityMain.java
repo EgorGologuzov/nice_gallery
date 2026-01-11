@@ -14,6 +14,7 @@ import com.nti.nice_gallery.R;
 import com.nti.nice_gallery.fragments.FragmentMediaAll;
 import com.nti.nice_gallery.fragments.FragmentMediaTree;
 import com.nti.nice_gallery.fragments.FragmentSettings;
+import com.nti.nice_gallery.utils.ManagerOfNavigation;
 import com.nti.nice_gallery.utils.ManagerOfPermissions;
 import com.nti.nice_gallery.utils.ManagerOfThreads;
 
@@ -34,28 +35,28 @@ public class ActivityMain extends AppCompatActivity {
 
     private static Integer menuSelectedItemId;
 
-    private BottomNavigationView bottomNavigationView;
-
     private FragmentMediaAll fragmentMediaAll;
     private FragmentMediaTree fragmentMediaTree;
     private FragmentSettings fragmentSettings;
 
     private Fragment currentFragment;
-    private HashMap<Fragment, Consumer<ActivityMain>> backButtonPressedListeners;
 
-    private ManagerOfPermissions managerOfPermissions;
-    private ManagerOfThreads managerOfThreads;
+    private HashMap<Fragment, Consumer<ActivityMain>> backButtonPressedListeners;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
         setContentView(R.layout.activity_main);
         init();
     }
 
     private void init() {
-        bottomNavigationView = findViewById(R.id.bottomNavigationView);
+        BottomNavigationView bottomNavigationView = findViewById(R.id.bottomNavigationView);
+
+        ManagerOfPermissions managerOfPermissions = new ManagerOfPermissions(this);
+        ManagerOfThreads managerOfThreads = new ManagerOfThreads(this);
+
+        backButtonPressedListeners = new HashMap<>();
 
         fragmentMediaAll = (FragmentMediaAll) getSupportFragmentManager()
                 .findFragmentByTag(TAG_MEDIA_ALL);
@@ -75,10 +76,6 @@ public class ActivityMain extends AppCompatActivity {
                 currentFragment = fragmentSettings;
             }
         }
-
-        backButtonPressedListeners = new HashMap<>();
-        managerOfPermissions = new ManagerOfPermissions(this);
-        managerOfThreads = new ManagerOfThreads(this);
 
         Runnable showCurrentFragment = () -> {
             if (currentFragment == null) {
