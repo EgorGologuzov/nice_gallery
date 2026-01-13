@@ -4,6 +4,8 @@ import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.media.MediaPlayer;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.view.GestureDetector;
 import android.view.MotionEvent;
@@ -13,6 +15,7 @@ import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.SeekBar;
 import android.widget.TextView;
 
 import androidx.appcompat.app.AppCompatActivity;
@@ -22,6 +25,7 @@ import com.nti.nice_gallery.data.ManagerOfFiles;
 import com.nti.nice_gallery.models.ModelGetFilesResponse;
 import com.nti.nice_gallery.models.ModelGetPreviewRequest;
 import com.nti.nice_gallery.models.ModelMediaFile;
+import com.nti.nice_gallery.utils.Convert;
 import com.nti.nice_gallery.utils.GestureListener;
 import com.nti.nice_gallery.utils.ManagerOfNavigation;
 import com.nti.nice_gallery.utils.ManagerOfNotifications;
@@ -31,6 +35,7 @@ import com.nti.nice_gallery.views.buttons.ButtonFileInfo;
 import com.nti.nice_gallery.views.buttons.ButtonPlay;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
@@ -39,6 +44,7 @@ import java.util.stream.Collectors;
 public class ActivityMediaView extends AppCompatActivity {
 
     private static final String LOG_TAG = "ActivityMediaView";
+    private static final Object EMPTY = new Object();
 
     private static int currentFileIndex;
     private static int pastFileIndex;
@@ -49,7 +55,9 @@ public class ActivityMediaView extends AppCompatActivity {
     private static ConcurrentHashMap<Integer, Object> previewsLoadingInProgress;
     private static Consumer<Integer> previewLoadedListener;
     private static boolean isVideoPaused;
+    private static Integer currentVideoTick;
     private static MediaPlayer mediaPlayer;
+    private static Handler videoTickHandler;
 
     private Runnable onActivityDestroy;
 
@@ -66,12 +74,15 @@ public class ActivityMediaView extends AppCompatActivity {
         LinearLayout bottomPanel = findViewById(R.id.bottomPanel);
         ButtonFileInfo buttonFileInfo = findViewById(R.id.buttonFileInfo);
         ButtonPlay buttonPlay = findViewById(R.id.buttonPlay);
-        TextView counterView = findViewById(R.id.counterView);
+        SeekBar seekBar = findViewById(R.id.seekBar);
+        TextView timeView = findViewById(R.id.timeView);
+        TextView infoView = findViewById(R.id.infoView);
         FrameLayout previewLayout = findViewById(R.id.previewLayout);
         ImageView imageView = findViewById(R.id.imageView);
         ImageView imageView2 = findViewById(R.id.imageView2);
         SurfaceView surfaceView = findViewById(R.id.surfaceView);
 
+        Convert convert = new Convert(this);
         ManagerOfNavigation managerOfNavigation = new ManagerOfNavigation(this);
         ManagerOfFiles managerOfFiles = new ManagerOfFiles(this);
         ManagerOfThreads managerOfThreads = new ManagerOfThreads(this);
@@ -87,9 +98,14 @@ public class ActivityMediaView extends AppCompatActivity {
             previewsLoadingInProgress = new ConcurrentHashMap<>();
             previewLoadedListener = null;
             isVideoPaused = false;
+            currentVideoTick = -1;
             if (mediaPlayer != null) {
                 mediaPlayer.release();
                 mediaPlayer = null;
+            }
+            if (videoTickHandler != null) {
+                videoTickHandler.removeCallbacksAndMessages(null);
+                videoTickHandler = null;
             }
         };
 
@@ -124,6 +140,39 @@ public class ActivityMediaView extends AppCompatActivity {
             bottomPanel.setVisibility(visibility);
         };
 
+        Runnable onCurrentFileChange = () -> {
+            if (currentFileIndex < 0 || files == null || currentFileIndex >= files.size()) {
+                return;
+            }
+
+            ModelMediaFile currentFile = files.get(currentFileIndex);
+
+            bottomActionBar.setVisibility(currentFile.isVideo && currentFile.error == null ? View.VISIBLE : View.GONE);
+            buttonFileInfo.setFile(currentFile);
+
+            String info = getString(R.string.format_counter_file_index_from_all_files, currentFileIndex + 1, files.size());
+
+            try {
+                ArrayList<String> infoItems = new ArrayList<>();
+                infoItems.add(info);
+
+                if (currentFile.isVideo) {
+                    infoItems.add(convert.durationToTimeString(currentFile.duration));
+                }
+
+                if (currentFile.isFile) {
+                    infoItems.add(convert.weightToString(currentFile.weight));
+                    infoItems.add(convert.dateToFullNumericDateString(currentFile.createdAt));
+                }
+
+                info = String.join(getString(R.string.symbol_dot_separator), infoItems);
+            } catch (Exception e) {
+                Log.e(LOG_TAG, e.getMessage());
+            }
+
+            infoView.setText(info);
+        };
+
         Runnable adjustSurfaceSizeToVideoSize = () -> {
             ModelMediaFile currentFile = files.get(currentFileIndex);
 
@@ -154,6 +203,70 @@ public class ActivityMediaView extends AppCompatActivity {
             surfaceView.requestLayout();
         };
 
+        Runnable updateTimeBar = () -> {
+            if (mediaPlayer == null) {
+                return;
+            }
+
+            int currentTick = mediaPlayer.getCurrentPosition();
+            seekBar.setProgress(currentTick);
+            timeView.setText(convert.durationToTimeString(currentTick));
+        };
+
+        SeekBar.OnSeekBarChangeListener onSeekBarChange = new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int i, boolean b) {}
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {}
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
+                if (mediaPlayer != null) {
+                    int progress = seekBar.getProgress();
+                    mediaPlayer.seekTo(progress, MediaPlayer.SEEK_CLOSEST);
+                }
+            }
+        };
+
+        Runnable initTimeBar = () -> {
+            ModelMediaFile currentFile = files.get(currentFileIndex);
+
+            if (!currentFile.isVideo || currentFile.duration == null) {
+                return;
+            }
+
+            Runnable onVideoTick = new Runnable() {
+                @Override
+                public void run() {
+                    updateTimeBar.run();
+                    videoTickHandler.postDelayed(this, 100);
+                }
+            };
+
+            seekBar.setVisibility(View.VISIBLE);
+            seekBar.setMin(0);
+            seekBar.setMax(currentFile.duration);
+            seekBar.setProgress(0);
+            seekBar.setOnSeekBarChangeListener(onSeekBarChange);
+
+            timeView.setVisibility(View.VISIBLE);
+
+            updateTimeBar.run();
+
+            videoTickHandler = new Handler(Looper.getMainLooper());
+            videoTickHandler.post(onVideoTick);
+        };
+
+        Runnable destroyTimeBar = () -> {
+            seekBar.setVisibility(View.GONE);
+            timeView.setVisibility(View.GONE);
+            if (videoTickHandler != null) {
+                videoTickHandler.removeCallbacksAndMessages(null);
+                videoTickHandler = null;
+            }
+        };
+
         Runnable stopVideoIfPlaying = () -> {
             if (mediaPlayer != null) {
                 mediaPlayer.stop();
@@ -164,6 +277,7 @@ public class ActivityMediaView extends AppCompatActivity {
             isVideoPaused = false;
             surfaceView.setVisibility(View.GONE);
             buttonPlay.setState(ButtonPlay.State.Stop);
+            destroyTimeBar.run();
         };
 
         Runnable onVideoPlayingError = () -> {
@@ -196,7 +310,7 @@ public class ActivityMediaView extends AppCompatActivity {
         Runnable startVideo = () -> {
             ModelMediaFile currentFile = files.get(currentFileIndex);
 
-            if (!currentFile.isVideo) {
+            if (!currentFile.isVideo || currentFile.duration == null) {
                 return;
             }
 
@@ -208,6 +322,8 @@ public class ActivityMediaView extends AppCompatActivity {
                 return;
             }
 
+            initTimeBar.run();
+
             surfaceView.setVisibility(View.VISIBLE);
             surfaceView.post(() -> {
                 try {
@@ -218,7 +334,7 @@ public class ActivityMediaView extends AppCompatActivity {
                     mediaPlayer.prepareAsync();
                 } catch (IOException e) {
                     Log.e(LOG_TAG, e.getMessage());
-                    mediaPlayer = null;
+                    onVideoPlayingError.run();
                 }
             });
         };
@@ -227,6 +343,8 @@ public class ActivityMediaView extends AppCompatActivity {
             if (mediaPlayer == null) {
                 return;
             }
+
+            initTimeBar.run();
 
             surfaceView.setVisibility(View.VISIBLE);
             surfaceView.post(() -> {
@@ -306,16 +424,19 @@ public class ActivityMediaView extends AppCompatActivity {
         };
 
         Runnable showCurrentFile = () -> {
-            final int MAX_PREVIEW_CASH_SIZE = 4;
-
             if (files == null || currentFileIndex < 0 || currentFileIndex >= files.size()) {
                 return;
             }
 
             Runnable updateCache = () -> {
+                final int MAX_PREVIEW_CASH_SIZE = 4;
+                final boolean CLEAR_CACHE = false;
+
                 final int staleCacheBoundary = MAX_PREVIEW_CASH_SIZE / 2;
 
-                cachedPreviews.entrySet().removeIf(e -> Math.abs(currentFileIndex - e.getKey()) > staleCacheBoundary);
+                if (CLEAR_CACHE) {
+                    cachedPreviews.entrySet().removeIf(e -> Math.abs(currentFileIndex - e.getKey()) > staleCacheBoundary);
+                }
 
                 final int startIndex = currentFileIndex - (MAX_PREVIEW_CASH_SIZE / 2);
                 final int endIndex = currentFileIndex + (MAX_PREVIEW_CASH_SIZE / 2);
@@ -343,7 +464,7 @@ public class ActivityMediaView extends AppCompatActivity {
 
                     managerOfFiles.getPreviewAsync(previewRequest, response -> {
                         Bitmap preview = response != null ? response.preview : null;
-                        cachedPreviews.put(indexFinal, preview != null ? preview : new Object());
+                        cachedPreviews.put(indexFinal, preview != null ? preview : EMPTY);
                         previewsLoadingInProgress.remove(indexFinal);
                         if (previewLoadedListener != null) {
                             previewLoadedListener.accept(indexFinal);
@@ -354,8 +475,9 @@ public class ActivityMediaView extends AppCompatActivity {
 
             Runnable loadCurrentFilePreview = () -> {
 
-                if (cachedPreviews.containsKey(currentFileIndex) && cachedPreviews.get(currentFileIndex) instanceof Bitmap) {
-                    Bitmap preview = (Bitmap) cachedPreviews.get(currentFileIndex);
+                if (cachedPreviews.containsKey(currentFileIndex)) {
+                    Object cachedValue = cachedPreviews.get(currentFileIndex);
+                    Bitmap preview = cachedValue instanceof Bitmap ? (Bitmap) cachedValue : null;
                     setPreviewAndAnimate.accept(preview);
                     return;
                 }
@@ -393,9 +515,10 @@ public class ActivityMediaView extends AppCompatActivity {
                 return;
             }
 
-            stopVideoIfPlaying.run();
-
             currentFileIndex++;
+
+            stopVideoIfPlaying.run();
+            onCurrentFileChange.run();
             showCurrentFile.run();
         };
 
@@ -404,9 +527,10 @@ public class ActivityMediaView extends AppCompatActivity {
                 return;
             }
 
-            stopVideoIfPlaying.run();
-
             currentFileIndex--;
+
+            stopVideoIfPlaying.run();
+            onCurrentFileChange.run();
             showCurrentFile.run();
         };
 
@@ -471,6 +595,7 @@ public class ActivityMediaView extends AppCompatActivity {
 
         showCurrentFile.run();
         onUpdateToolPanelsVisibility.run();
+        onCurrentFileChange.run();
         restoreVideoIfPlaying.run();
     }
 

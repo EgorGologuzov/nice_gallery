@@ -69,6 +69,8 @@ public class Convert {
             return null;
         }
 
+        duration /= 1000; // millis to seconds
+
         int div = duration;
         int seconds = div % 60;
         div /= 60;

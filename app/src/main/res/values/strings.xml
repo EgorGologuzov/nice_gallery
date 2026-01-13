@@ -23,6 +23,8 @@
     <string name="format_free_space_from_total_space">Свободно %s из %s</string>
     <!--Names-->
     <string name="format_name_storage_name">[%s]</string>
+    <!--Counters-->
+    <string name="format_counter_file_index_from_all_files">%d / %d</string>
 
 <!--Symbols-->
     <string name="symbol_dot_separator">" • "</string>
@@ -44,6 +46,7 @@
     <string name="message_error_load_file_info_failed">Ошибка загрузки информации о файле</string>
     <string name="message_error_scanning_failed">Ошибка при сканировании</string>
     <string name="message_error_video_playing_failed">Ошибка при воспроизведении видео</string>
+    <string name="message_error_file_properties_read_failed">Ошибка при чтении свойств файла</string>
 
 <!--Dialogs-->
     <string name="dialog_title_permission_required">Необходимо разрешение</string>
@@ -51,6 +54,7 @@
     <string name="dialog_title_grid_variant">Вариант сетки</string>
     <string name="dialog_title_sort_variant">Вариант сортировки</string>
     <string name="dialog_title_something_wrong">Что-то пошло не так</string>
+    <string name="dialog_title_file_properties">Свойства файла</string>
     <string name="dialog_button_ok">ОК</string>
     <string name="dialog_button_yes">Да</string>
     <string name="dialog_button_no">Нет</string>
@@ -71,6 +75,12 @@
         <item>По дате изменения (Я-А)</item>
         <item>По весу (А-Я)</item>
         <item>По весу (Я-А)</item>
+    </string-array>
+    <string-array name="enum_file_types">
+        <item>Изображение</item>
+        <item>Видео</item>
+        <item>Папка</item>
+        <item>Хранилище</item>
     </string-array>
 
 </resources>

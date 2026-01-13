@@ -640,7 +640,7 @@ public class ManagerOfFiles implements IManagerOfFiles {
                 rotation = Integer.parseInt(rotationStr);
             }
             if (durationStr != null) {
-                duration = Integer.parseInt(durationStr) / 1000; // millis to seconds
+                duration = Integer.parseInt(durationStr);
             }
 
             if (rotation == 90 || rotation == 270) {

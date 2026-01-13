@@ -49,7 +49,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:paddingBottom="8dp"
+        android:paddingVertical="8dp"
         android:background="@color/translucent_background"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent">
@@ -57,14 +57,35 @@
         <com.nti.nice_gallery.views.ViewActionBar
             android:id="@+id/bottomActionBar"
             style="@style/Custom_ActionBar">
+
             <com.nti.nice_gallery.views.buttons.ButtonPlay
                 android:id="@+id/buttonPlay"
                 style="@style/Custom_ActionBar_Button" />
+
+            <SeekBar
+                android:id="@+id/seekBar"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:thumbTint="@color/orange_700"
+                android:progressTint="@color/orange_700"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/timeView"
+                style="@style/TextAppearance.AppCompat.Body1"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0:00"
+                android:textAlignment="center"
+                android:layout_marginRight="8dp"
+                android:visibility="gone" />
+
         </com.nti.nice_gallery.views.ViewActionBar>
 
 
         <TextView
-            android:id="@+id/counterView"
+            android:id="@+id/infoView"
             style="@style/TextAppearance.AppCompat.Small"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
