@@ -60,6 +60,8 @@ public class ActivityMediaView extends AppCompatActivity {
     private static Handler videoTickHandler;
 
     private Runnable onActivityDestroy;
+    private Runnable onStartActivity;
+    private Runnable onStopActivity;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -161,6 +163,7 @@ public class ActivityMediaView extends AppCompatActivity {
                 }
 
                 if (currentFile.isFile) {
+                    infoItems.add(currentFile.extension.toUpperCase());
                     infoItems.add(convert.weightToString(currentFile.weight));
                     infoItems.add(convert.dateToFullNumericDateString(currentFile.createdAt));
                 }
@@ -317,6 +320,7 @@ public class ActivityMediaView extends AppCompatActivity {
             if (mediaPlayer != null) {
                 if (!mediaPlayer.isPlaying()) {
                     isVideoPaused = false;
+                    mediaPlayer.seekTo(currentVideoTick, MediaPlayer.SEEK_CLOSEST);
                     mediaPlayer.start();
                 }
                 return;
@@ -350,6 +354,7 @@ public class ActivityMediaView extends AppCompatActivity {
             surfaceView.post(() -> {
                 bindSurfaceToMediaPlayer.run();
                 if (!isVideoPaused) {
+                    mediaPlayer.seekTo(currentVideoTick, MediaPlayer.SEEK_CLOSEST);
                     mediaPlayer.start();
                 }
             });
@@ -357,6 +362,7 @@ public class ActivityMediaView extends AppCompatActivity {
 
         Runnable pauseVideoIfPlaying = () -> {
             if (mediaPlayer != null && !isVideoPaused) {
+                currentVideoTick = mediaPlayer.getCurrentPosition();
                 isVideoPaused = true;
                 mediaPlayer.pause();
             }
@@ -574,6 +580,7 @@ public class ActivityMediaView extends AppCompatActivity {
 
         Runnable onRecreateActivity = () -> {
             if (mediaPlayer != null) {
+                currentVideoTick = mediaPlayer.getCurrentPosition();
                 mediaPlayer.pause();
                 unbindSurfaceFromMediaPlayer.run();
             }
@@ -585,6 +592,14 @@ public class ActivityMediaView extends AppCompatActivity {
             } else {
                 onRecreateActivity.run();
             }
+        };
+
+        onStartActivity = () -> {
+            restoreVideoIfPlaying.run();
+        };
+
+        onStopActivity = () -> {
+            onRecreateActivity.run();
         };
 
         refreshState.run();
@@ -604,6 +619,22 @@ public class ActivityMediaView extends AppCompatActivity {
         super.onDestroy();
         if (onActivityDestroy != null) {
             onActivityDestroy.run();
+        }
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        if (onStartActivity != null) {
+            onStartActivity.run();
+        }
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        if (onStopActivity != null) {
+            onStopActivity.run();
         }
     }
 
