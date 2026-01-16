@@ -11,14 +11,18 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.nti.nice_gallery.R;
+import com.nti.nice_gallery.activities.ActivityMediaView;
 import com.nti.nice_gallery.data.Domain;
 import com.nti.nice_gallery.data.IManagerOfFiles;
-import com.nti.nice_gallery.data.ManagerOfFiles;
+import com.nti.nice_gallery.data.IManagerOfSettings;
+import com.nti.nice_gallery.data.ManagerOfSettings;
 import com.nti.nice_gallery.models.ModelFilters;
 import com.nti.nice_gallery.models.ModelGetFilesRequest;
+import com.nti.nice_gallery.models.ModelGetFilesResponse;
 import com.nti.nice_gallery.models.ModelMediaFile;
 import com.nti.nice_gallery.models.ModelScanParams;
 import com.nti.nice_gallery.utils.ManagerOfDialogs;
+import com.nti.nice_gallery.utils.ManagerOfNavigation;
 import com.nti.nice_gallery.utils.ManagerOfThreads;
 import com.nti.nice_gallery.utils.ReadOnlyList;
 import com.nti.nice_gallery.views.ViewActionBar;
@@ -28,15 +32,18 @@ import com.nti.nice_gallery.views.buttons.ButtonChoiceGridVariant;
 import com.nti.nice_gallery.views.buttons.ButtonChoiceSortVariant;
 import com.nti.nice_gallery.views.buttons.ButtonRefresh;
 import com.nti.nice_gallery.views.buttons.ButtonScanningReport;
+import com.nti.nice_gallery.views.grid_items.GridItemBase;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 public class FragmentMediaAll extends Fragment {
 
     private ModelGetFilesRequest request;
+    private ModelGetFilesResponse response;
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
@@ -53,8 +60,31 @@ public class FragmentMediaAll extends Fragment {
         IManagerOfFiles managerOfFiles = Domain.getManagerOfFiles(getContext());
         ManagerOfThreads managerOfThreads = new ManagerOfThreads(getContext());
         ManagerOfDialogs managerOfDialogs = new ManagerOfDialogs(getContext());
+        ManagerOfNavigation managerOfNavigation = new ManagerOfNavigation(getContext());
+        IManagerOfSettings managerOfSettings = Domain.getManagerOfSettings(getContext());
 
-        request = getTestRequest();
+        Supplier<ModelGetFilesRequest> buildRequest = () -> {
+            ModelGetFilesRequest.SortVariant sortVariant = ModelGetFilesRequest.SortVariant.ByCreateAtDesc;
+            boolean foldersFirst = true;
+
+            if (request != null) {
+                sortVariant = request.sortVariant;
+                foldersFirst = request.foldersFirst;
+            }
+
+            ModelScanParams scanParams = managerOfSettings.getScanParams();
+            ModelFilters filters = managerOfSettings.getFilters();
+
+            return new ModelGetFilesRequest(
+                    null,
+                    scanParams,
+                    filters,
+                    sortVariant,
+                    foldersFirst
+            );
+        };
+
+        request = buildRequest.get();
 
         Consumer<ModelGetFilesRequest.SortVariant> updateRequestSortVariant = newSortVariant -> {
             if (request == null) {
@@ -71,9 +101,11 @@ public class FragmentMediaAll extends Fragment {
         };
 
         Runnable refreshFilesList = () -> {
+            request = buildRequest.get();
             viewMediaGrid.trySetStateScanningInProgress(true);
             managerOfFiles.getFilesAsync(request, response -> {
                 managerOfThreads.runOnUiThread(() -> {
+                    FragmentMediaAll.this.response = response;
                     if (response.error == null) {
                         viewMediaGrid.setItems(response.files);
                         viewMediaGrid.trySetStateScanningInProgress(false);
@@ -84,6 +116,19 @@ public class FragmentMediaAll extends Fragment {
                     }
                 });
             });
+        };
+
+        Consumer<GridItemBase> onGridItemClick = item -> {
+            ModelMediaFile file = item.getModel();
+
+            if (file.isFile) {
+                ActivityMediaView.Payload payload = new ActivityMediaView.Payload(
+                        response,
+                        file
+                );
+
+                managerOfNavigation.navigate(ActivityMediaView.class, payload);
+            }
         };
 
         Consumer<ViewMediaGrid> onViewMediaGridStateChangeListener = v -> {
@@ -100,6 +145,8 @@ public class FragmentMediaAll extends Fragment {
         };
 
         viewMediaGrid.setStateChangeListener(onViewMediaGridStateChangeListener);
+        viewMediaGrid.setItemClickListener(onGridItemClick);
+
         buttonGridVariant.setVariantChangeListener(onGridVariantChange);
         buttonSortVariant.setVariantChangeListener(onSortVariantChange);
         buttonRefresh.setRefreshListener(refreshFilesList);

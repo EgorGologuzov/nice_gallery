@@ -55,7 +55,6 @@ public class ActivityMediaView extends AppCompatActivity {
     private static ConcurrentHashMap<Integer, Object> previewsLoadingInProgress;
     private static Consumer<Integer> previewLoadedListener;
     private static boolean isVideoPaused;
-    private static Integer currentVideoTick;
     private static MediaPlayer mediaPlayer;
     private static Handler videoTickHandler;
 
@@ -100,7 +99,6 @@ public class ActivityMediaView extends AppCompatActivity {
             previewsLoadingInProgress = new ConcurrentHashMap<>();
             previewLoadedListener = null;
             isVideoPaused = false;
-            currentVideoTick = -1;
             if (mediaPlayer != null) {
                 mediaPlayer.release();
                 mediaPlayer = null;
@@ -320,7 +318,6 @@ public class ActivityMediaView extends AppCompatActivity {
             if (mediaPlayer != null) {
                 if (!mediaPlayer.isPlaying()) {
                     isVideoPaused = false;
-                    mediaPlayer.seekTo(currentVideoTick, MediaPlayer.SEEK_CLOSEST);
                     mediaPlayer.start();
                 }
                 return;
@@ -354,7 +351,6 @@ public class ActivityMediaView extends AppCompatActivity {
             surfaceView.post(() -> {
                 bindSurfaceToMediaPlayer.run();
                 if (!isVideoPaused) {
-                    mediaPlayer.seekTo(currentVideoTick, MediaPlayer.SEEK_CLOSEST);
                     mediaPlayer.start();
                 }
             });
@@ -362,7 +358,6 @@ public class ActivityMediaView extends AppCompatActivity {
 
         Runnable pauseVideoIfPlaying = () -> {
             if (mediaPlayer != null && !isVideoPaused) {
-                currentVideoTick = mediaPlayer.getCurrentPosition();
                 isVideoPaused = true;
                 mediaPlayer.pause();
             }
@@ -580,7 +575,6 @@ public class ActivityMediaView extends AppCompatActivity {
 
         Runnable onRecreateActivity = () -> {
             if (mediaPlayer != null) {
-                currentVideoTick = mediaPlayer.getCurrentPosition();
                 mediaPlayer.pause();
                 unbindSurfaceFromMediaPlayer.run();
             }

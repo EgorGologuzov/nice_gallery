@@ -19,10 +19,10 @@
     <string name="format_duration_full">%d:%02d:%02d</string>
     <!--Elements count-->
     <string name="format_elements_count">%d элемент(а/ов)</string>
-    <!--Storage space-->
+    <!--Storage-->
     <string name="format_free_space_from_total_space">Свободно %s из %s</string>
-    <!--Names-->
     <string name="format_name_storage_name">[%s]</string>
+    <string name="format_storage_info">%s %s</string>
     <!--Counters-->
     <string name="format_counter_file_index_from_all_files">%d / %d</string>
 
@@ -55,9 +55,15 @@
     <string name="dialog_title_sort_variant">Вариант сортировки</string>
     <string name="dialog_title_something_wrong">Что-то пошло не так</string>
     <string name="dialog_title_file_properties">Свойства файла</string>
+    <string name="dialog_title_prompt_input_path">Введите путь</string>
+    <string name="dialog_title_scan_mode">Режим сканирования</string>
     <string name="dialog_button_ok">ОК</string>
     <string name="dialog_button_yes">Да</string>
     <string name="dialog_button_no">Нет</string>
+    <string name="dialog_button_cancel">Отмена</string>
+
+<!--Settings titles-->
+    <string name="settings_title_scan_params">Параметры сканирования</string>
 
 <!--Enums-->
     <string-array name="enum_grid_variants">
@@ -81,6 +87,12 @@
         <item>Видео</item>
         <item>Папка</item>
         <item>Хранилище</item>
+    </string-array>
+    <string-array name="enum_scan_modes">
+        <item>Сканировать все</item>
+        <item>Только папки из списка</item>
+        <item>Только папки НЕ из списка</item>
+        <item>Игнорировать хранилище</item>
     </string-array>
 
 </resources>

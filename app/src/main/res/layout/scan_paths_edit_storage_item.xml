@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:gravity="center">
+
+    <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center">
+
+        <com.nti.nice_gallery.views.buttons.ButtonChoiceScanMode
+            android:id="@+id/buttonScanMode"
+            style="@style/Custom_ActionBar_Button"
+            android:layout_marginHorizontal="8dp"
+            android:tint="@color/orange_700" />
+
+        <TextView
+            android:id="@+id/storageInfoView"
+            style="@style/TextAppearance.AppCompat.Body2"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="[Storage info]"
+            android:layout_weight="1"
+            android:maxLines="2"
+            android:ellipsize="end"/>
+
+        <com.nti.nice_gallery.views.buttons.ButtonBase
+            android:id="@+id/buttonAdd"
+            style="@style/Custom_ActionBar_Button"
+            android:src="@drawable/baseline_add_24"
+            android:layout_marginHorizontal="8dp" />
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/pathsList"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center">
+
+<!--        <LinearLayout-->
+<!--            android:layout_width="match_parent"-->
+<!--            android:layout_height="wrap_content"-->
+<!--            android:orientation="horizontal"-->
+<!--            android:gravity="center">-->
+
+<!--            <ImageButton-->
+<!--                android:layout_width="wrap_content"-->
+<!--                android:layout_height="wrap_content"-->
+<!--                android:src="@drawable/baseline_delete_forever_24"-->
+<!--                android:layout_marginRight="8dp"/>-->
+
+<!--            <TextView-->
+<!--                style="@style/TextAppearance.AppCompat.Body1"-->
+<!--                android:layout_width="match_parent"-->
+<!--                android:layout_height="wrap_content"-->
+<!--                android:text="[/path/to/scan/or/ignore/folder]"/>-->
+
+<!--        </LinearLayout>-->
+
+<!--        <LinearLayout-->
+<!--            android:layout_width="match_parent"-->
+<!--            android:layout_height="wrap_content"-->
+<!--            android:orientation="horizontal"-->
+<!--            android:gravity="center">-->
+
+<!--            <ImageButton-->
+<!--                android:layout_width="wrap_content"-->
+<!--                android:layout_height="wrap_content"-->
+<!--                android:src="@drawable/baseline_delete_forever_24"-->
+<!--                android:layout_marginRight="8dp"/>-->
+
+<!--            <TextView-->
+<!--                style="@style/TextAppearance.AppCompat.Body1"-->
+<!--                android:layout_width="match_parent"-->
+<!--                android:layout_height="wrap_content"-->
+<!--                android:text="[/path/to/scan/or/ignore/folder]"/>-->
+
+<!--        </LinearLayout>-->
+
+    </LinearLayout>
+
+</LinearLayout>

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center">
+
+    <TextView
+        android:id="@+id/pathView"
+        style="@style/TextAppearance.AppCompat.Body1"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="[/path/to/scan/or/ignore/folder]"
+        android:layout_weight="1"
+        android:layout_marginLeft="16dp"
+        android:maxLines="2"
+        android:ellipsize="end"/>
+
+    <com.nti.nice_gallery.views.buttons.ButtonBase
+        android:id="@+id/buttonDelete"
+        style="@style/Custom_ActionBar_Button"
+        android:src="@drawable/baseline_delete_forever_24"
+        android:layout_marginHorizontal="8dp" />
+
+</LinearLayout>

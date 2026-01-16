@@ -17,6 +17,7 @@ import com.nti.nice_gallery.activities.ActivityMain;
 import com.nti.nice_gallery.activities.ActivityMediaView;
 import com.nti.nice_gallery.data.Domain;
 import com.nti.nice_gallery.data.IManagerOfFiles;
+import com.nti.nice_gallery.data.IManagerOfSettings;
 import com.nti.nice_gallery.data.ManagerOfFiles;
 import com.nti.nice_gallery.models.ModelFilters;
 import com.nti.nice_gallery.models.ModelGetFilesRequest;
@@ -41,6 +42,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 import kotlin.jvm.functions.Function1;
 
@@ -72,13 +74,36 @@ public class FragmentMediaTree extends Fragment {
         ManagerOfThreads managerOfThreads = new ManagerOfThreads(getContext());
         ManagerOfDialogs managerOfDialogs = new ManagerOfDialogs(getContext());
         ManagerOfNavigation managerOfNavigation = new ManagerOfNavigation(getContext());
+        IManagerOfSettings managerOfSettings = Domain.getManagerOfSettings(getContext());
 
         if (pathStack == null) {
             pathStack = new ArrayList<>();
             pathStack.add(ManagerOfFiles.PATH_ROOT);
         }
 
-        request = getTestRequest();
+        Supplier<ModelGetFilesRequest> buildRequest = () -> {
+            ModelGetFilesRequest.SortVariant sortVariant = ModelGetFilesRequest.SortVariant.ByCreateAtDesc;
+            boolean foldersFirst = true;
+
+            if (request != null) {
+                sortVariant = request.sortVariant;
+                foldersFirst = request.foldersFirst;
+            }
+
+            ModelScanParams scanParams = managerOfSettings.getScanParams();
+            ModelFilters filters = managerOfSettings.getFilters();
+            String path = pathStack.get(pathStack.size() - 1);
+
+            return new ModelGetFilesRequest(
+                    path,
+                    scanParams,
+                    filters,
+                    sortVariant,
+                    foldersFirst
+            );
+        };
+
+        request = buildRequest.get();
 
         Consumer<ModelGetFilesRequest.SortVariant> updateRequestSortVariant = newSortVariant -> {
             if (request == null) {
@@ -94,21 +119,8 @@ public class FragmentMediaTree extends Fragment {
             );
         };
 
-        Consumer<String> updateRequestPath = newPath -> {
-            if (request == null) {
-                return;
-            }
-
-            request = new ModelGetFilesRequest(
-                    newPath,
-                    request.scanParams,
-                    request.filters,
-                    request.sortVariant,
-                    request.foldersFirst
-            );
-        };
-
         Runnable refreshFilesList = () -> {
+            request = buildRequest.get();
             viewMediaGrid.trySetStateScanningInProgress(true);
             managerOfFiles.getFilesAsync(request, response -> {
                 managerOfThreads.runOnUiThread(() -> {
@@ -151,7 +163,6 @@ public class FragmentMediaTree extends Fragment {
         };
 
         Consumer<ButtonPathsStack> onCurrentPathChange = btn -> {
-            updateRequestPath.accept(btn.getTopPath());
             refreshFilesList.run();
         };
 

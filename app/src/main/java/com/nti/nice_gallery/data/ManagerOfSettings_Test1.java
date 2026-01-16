@@ -26,12 +26,28 @@ public class ManagerOfSettings_Test1 implements IManagerOfSettings{
     }
 
     @Override
-    public void saveScanParams(ModelScanParams scanList) {
-        this.scanParams = scanList;
+    public void saveScanParams(ModelScanParams scanParams) {
+        this.scanParams = scanParams;
     }
 
     @Override
     public ModelFilters getFilters() {
+        if (this.filters == null) {
+            this.filters = new ModelFilters(
+                    true,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null
+            );
+        }
+
         return filters;
     }
 

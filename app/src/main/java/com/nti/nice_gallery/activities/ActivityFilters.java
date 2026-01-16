@@ -20,6 +20,7 @@ import androidx.appcompat.widget.SwitchCompat;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
 import com.nti.nice_gallery.R;
+import com.nti.nice_gallery.data.Domain;
 import com.nti.nice_gallery.data.IManagerOfSettings;
 import com.nti.nice_gallery.data.ManagerOfSettings_Test1;
 import com.nti.nice_gallery.models.ModelFilters;
@@ -55,7 +56,19 @@ public class ActivityFilters extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_filters);
 
-        Log.d("dbg","Created");
+        types = findViewById(R.id.types);
+        extensions = findViewById(R.id.extensions);
+        minWeight = findViewById(R.id.minWeight);
+        maxWeight = findViewById(R.id.maxWeight);
+        ignoreHidden = findViewById(R.id.ignoreHidden);
+        minCreateDate=findViewById(R.id.minCreateDate);
+        maxCreateDate=findViewById(R.id.maxCreateDate);
+        minUpdateDate=findViewById(R.id.minUpdateDate);
+        maxUpdateDate=findViewById(R.id.maxUpdateDate);
+        minDuration=findViewById(R.id.minDuration);
+        maxDuration=findViewById(R.id.maxDuration);
+
+        managerOfSettings = Domain.getManagerOfSettings(this);
 
         dateFormatter=DateTimeFormatter.ofPattern(getString(R.string.format_java_simple_date_full_numeric));
         setupComponents();
@@ -71,6 +84,9 @@ public class ActivityFilters extends AppCompatActivity {
         resetButton.setOnClickListener(view -> {
             managerOfSettings.saveFilters(null);
             Toast.makeText(this,"Настройки успешно сброшены",Toast.LENGTH_SHORT).show();
+            Intent toBintent = new Intent(this, ActivityMain.class);
+            toBintent.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
+            startActivity(toBintent);
         });
     }
 
@@ -81,7 +97,6 @@ public class ActivityFilters extends AppCompatActivity {
     }
 
     private void saveFilters() {
-        types = findViewById(R.id.types);
         List<ModelMediaFile.Type> resultTypes=null;
         if (!types.getCheckedChipIds().isEmpty()){
             resultTypes = new ArrayList<>();
@@ -92,7 +107,6 @@ public class ActivityFilters extends AppCompatActivity {
             }
         }
 
-        extensions = findViewById(R.id.extensions);
         List<String> resultExtensions = new ArrayList<>();
         if (!extensions.getCheckedChipIds().isEmpty()){
             resultExtensions = new ArrayList<>();
@@ -103,19 +117,16 @@ public class ActivityFilters extends AppCompatActivity {
             }
         }
 
-        minWeight = findViewById(R.id.minWeight);
         Long minWeightValue = null;
         if (!minWeight.getText().toString().isEmpty()) {
             minWeightValue = Long.parseLong(minWeight.getText().toString());
         }
 
-        maxWeight = findViewById(R.id.maxWeight);
         Long maxWeightValue = null;
         if (!maxWeight.getText().toString().isEmpty()) {
             maxWeightValue = Long.parseLong(maxWeight.getText().toString());
         }
 
-        ignoreHidden=findViewById(R.id.ignoreHidden);
         boolean ignoreHiddenValue=false;
         ignoreHiddenValue=ignoreHidden.isChecked();
 
@@ -131,7 +142,7 @@ public class ActivityFilters extends AppCompatActivity {
 
         LocalDateTime minUpdateAtValue=null;
         if (!minUpdateDate.getText().toString().equals("Начальная дата")){
-            minUpdateAtValue = LocalDate.parse(minUpdateDate.getText().toString(), dateFormatter).atTime(23, 59, 59);
+            minUpdateAtValue = LocalDate.parse(minUpdateDate.getText().toString(), dateFormatter).atStartOfDay();
         }
 
         LocalDateTime maxUpdateAtValue = null;
@@ -139,19 +150,16 @@ public class ActivityFilters extends AppCompatActivity {
             maxUpdateAtValue = LocalDate.parse(maxUpdateDate.getText().toString(), dateFormatter).atTime(23, 59, 59);
         }
 
-        maxDuration=findViewById(R.id.maxDuration);
-        minDuration=findViewById(R.id.minDuration);
-
         Integer maxDurationValue=null;
         if (!maxDuration.getText().toString().equals("конечная")){
-            maxDurationValue=Integer.parseInt(maxDuration.getText().toString().split(":")[0])*60+
-                    Integer.parseInt(maxDuration.getText().toString().split(":")[1]);
+            maxDurationValue=(Integer.parseInt(maxDuration.getText().toString().split(":")[0])*60+
+                    Integer.parseInt(maxDuration.getText().toString().split(":")[1])) * 60 * 1000;
         }
 
         Integer minDurationValue=null;
         if (!minDuration.getText().toString().equals("начальная")){
-            minDurationValue=Integer.parseInt(minDuration.getText().toString().split(":")[0])*60+
-                    Integer.parseInt(minDuration.getText().toString().split(":")[1]);
+            minDurationValue=(Integer.parseInt(minDuration.getText().toString().split(":")[0])*60+
+                    Integer.parseInt(minDuration.getText().toString().split(":")[1])) * 60 * 1000;
         }
 
         ModelFilters resultModel = new ModelFilters(
@@ -182,22 +190,37 @@ public class ActivityFilters extends AppCompatActivity {
         if (filterModel==null)
             return;
 
+        ignoreHidden.setChecked(filterModel.ignoreHidden);
+
         if (filterModel.minWeight != null)
-            minWeight.setText(String.valueOf(filterModel.minWeight));
+            minWeight.setText(filterModel.minWeight.toString());
         if (filterModel.maxWeight != null)
-            maxWeight.setText(String.valueOf(filterModel.maxWeight));
+            maxWeight.setText(filterModel.maxWeight.toString());
         if (filterModel.maxCreateAt != null)
-            maxCreateDate.setText(String.valueOf(filterModel.maxCreateAt));
+            maxCreateDate.setText(filterModel.maxCreateAt.format(dateFormatter));
         if (filterModel.minCreateAt != null)
-            minCreateDate.setText(String.valueOf(filterModel.minCreateAt));
+            minCreateDate.setText(filterModel.minCreateAt.format(dateFormatter));
         if (filterModel.minUpdateAt != null)
-            minUpdateDate.setText(String.valueOf(filterModel.minUpdateAt));
+            minUpdateDate.setText(filterModel.minUpdateAt.format(dateFormatter));
         if (filterModel.maxUpdateAt != null)
-            maxUpdateDate.setText(String.valueOf(filterModel.maxUpdateAt));
-        if (filterModel.minDuration != null)
-            minDuration.setText(String.valueOf(filterModel.minDuration));
-        if (filterModel.maxDuration != null)
-            maxDuration.setText(String.valueOf(filterModel.maxDuration));
+            maxUpdateDate.setText(filterModel.maxUpdateAt.format(dateFormatter));
+        if (filterModel.minDuration != null) {
+            int millis = filterModel.minDuration;
+            int seconds = millis / 1000;
+            int minutes = seconds / 60;
+            int hours = minutes / 60;
+            minutes = minutes % 60;
+            minDuration.setText(getString(R.string.format_duration_short, hours, minutes));
+        }
+
+        if (filterModel.maxDuration != null) {
+            int millis = filterModel.maxDuration;
+            int seconds = millis / 1000;
+            int minutes = seconds / 60;
+            int hours = minutes / 60;
+            minutes = minutes % 60;
+            maxDuration.setText(getString(R.string.format_duration_short, hours, minutes));
+        }
 
         if(filterModel.types != null){
             for (int i=0; i<types.getChildCount();i++){
@@ -229,7 +252,7 @@ public class ActivityFilters extends AppCompatActivity {
 
     private void fillInExtensions() {
         extensions = findViewById(R.id.extensions);
-        ModelFileFormat[] extensionList = ModelMediaFile.supportedMediaFormats;
+        ReadOnlyList<ModelFileFormat> extensionList = ModelMediaFile.supportedMediaFormats;
         for(ModelFileFormat file:extensionList){
             Chip chip=new Chip(this);
             chip.setText(file.fileExtension);
@@ -239,8 +262,8 @@ public class ActivityFilters extends AppCompatActivity {
     }
 
     private void setupComponents() {
-        minCreateDate=findViewById(R.id.minCreateDate);
-        maxCreateDate=findViewById(R.id.maxCreateDate);
+        LocalDate today = LocalDate.now();
+
         minCreateDate.setOnClickListener(view1 -> {
             DatePickerDialog dialog= new DatePickerDialog(this, new DatePickerDialog.OnDateSetListener() {
                 @Override
@@ -248,9 +271,10 @@ public class ActivityFilters extends AppCompatActivity {
                     LocalDate date=LocalDate.of(year,month+1,day);
                     minCreateDate.setText(date.format(dateFormatter));
                 };
-            },2025,11,25);
+            }, today.getYear(), today.getMonthValue() - 1, today.getDayOfMonth());
             dialog.show();
         });
+
         maxCreateDate.setOnClickListener(view1 -> {
             DatePickerDialog dialog= new DatePickerDialog(this, new DatePickerDialog.OnDateSetListener() {
                 @Override
@@ -258,12 +282,10 @@ public class ActivityFilters extends AppCompatActivity {
                     LocalDate date=LocalDate.of(year,month+1,day);
                     maxCreateDate.setText(date.format(dateFormatter));
                 };
-            },2025,11,25);
+            }, today.getYear(), today.getMonthValue() - 1, today.getDayOfMonth());
             dialog.show();
         });
 
-        minUpdateDate=findViewById(R.id.minUpdateDate);
-        maxUpdateDate=findViewById(R.id.maxUpdateDate);
         minUpdateDate.setOnClickListener(view1 -> {
             DatePickerDialog dialog= new DatePickerDialog(this, new DatePickerDialog.OnDateSetListener() {
                 @Override
@@ -271,9 +293,10 @@ public class ActivityFilters extends AppCompatActivity {
                     LocalDate date=LocalDate.of(year,month+1,day);
                     minUpdateDate.setText(date.format(dateFormatter));
                 };
-            },2025,11,25);
+            }, today.getYear(), today.getMonthValue() - 1, today.getDayOfMonth());
             dialog.show();
         });
+
         maxUpdateDate.setOnClickListener(view1 -> {
             DatePickerDialog dialog= new DatePickerDialog(this, new DatePickerDialog.OnDateSetListener() {
                 @Override
@@ -281,37 +304,34 @@ public class ActivityFilters extends AppCompatActivity {
                     LocalDate date=LocalDate.of(year,month+1,day);
                     maxUpdateDate.setText(date.format(dateFormatter));
                 };
-            },2025,11,25);
+            }, today.getYear(), today.getMonthValue() - 1, today.getDayOfMonth());
             dialog.show();
         });
 
-        minDuration=findViewById(R.id.minDuration);
         minDuration.setOnClickListener(view -> {
             TimePickerDialog.OnTimeSetListener onTimeSetListener=new TimePickerDialog.OnTimeSetListener() {
                 @Override
                 public void onTimeSet(TimePicker timePicker, int selectedHour, int selectedMinute) {
                     hour=selectedHour;
                     minute=selectedMinute;
-                    minDuration.setText(String.format(Locale.getDefault(),getString(R.string.format_duration_short),hour,minute));
-                }
-            };
-            TimePickerDialog dialog=new TimePickerDialog(this,onTimeSetListener,hour,minute,true);
-            dialog.show();
-        });
-        maxDuration=findViewById(R.id.maxDuration);
-        maxDuration.setOnClickListener(view -> {
-            TimePickerDialog.OnTimeSetListener onTimeSetListener=new TimePickerDialog.OnTimeSetListener() {
-                @Override
-                public void onTimeSet(TimePicker timePicker, int selectedHour, int selectedMinute) {
-                    hour=selectedHour;
-                    minute=selectedMinute;
-                    maxDuration.setText(String.format(Locale.getDefault(),getString(R.string.format_duration_short),hour,minute));
+                    minDuration.setText(getString(R.string.format_duration_short, hour, minute));
                 }
             };
             TimePickerDialog dialog=new TimePickerDialog(this,onTimeSetListener,hour,minute,true);
             dialog.show();
         });
 
-        managerOfSettings=new ManagerOfSettings_Test1(this);
+        maxDuration.setOnClickListener(view -> {
+            TimePickerDialog.OnTimeSetListener onTimeSetListener=new TimePickerDialog.OnTimeSetListener() {
+                @Override
+                public void onTimeSet(TimePicker timePicker, int selectedHour, int selectedMinute) {
+                    hour=selectedHour;
+                    minute=selectedMinute;
+                    maxDuration.setText(getString(R.string.format_duration_short, hour, minute));
+                }
+            };
+            TimePickerDialog dialog=new TimePickerDialog(this,onTimeSetListener,hour,minute,true);
+            dialog.show();
+        });
     }
 }
