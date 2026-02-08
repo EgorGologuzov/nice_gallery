@@ -16,14 +16,18 @@ import com.nti.nice_gallery.models.ModelScanParams;
 import com.nti.nice_gallery.models.ModelStorage;
 import com.nti.nice_gallery.utils.Convert;
 import com.nti.nice_gallery.utils.ManagerOfDialogs;
+import com.nti.nice_gallery.utils.ManagerOfNotifications;
 import com.nti.nice_gallery.utils.ReadOnlyList;
 import com.nti.nice_gallery.views.buttons.ButtonBase;
 import com.nti.nice_gallery.views.buttons.ButtonChoiceScanMode;
 
 import java.util.ArrayList;
 import java.util.function.Consumer;
+import java.util.regex.Pattern;
 
 public class ScanPathsEditStorageItem extends LinearLayout {
+
+    private static final Pattern ANDROID_PATH_PATTERN = Pattern.compile("^/(?:[^/\0]+(?:/|$))*$");
 
     ButtonBase buttonAdd;
     ButtonChoiceScanMode buttonScanMode;
@@ -37,6 +41,7 @@ public class ScanPathsEditStorageItem extends LinearLayout {
     Consumer<ScanPathsEditStorageItem> storageParamsChangeListener;
 
     ManagerOfDialogs managerOfDialogs;
+    ManagerOfNotifications managerOfNotifications;
     Convert convert;
 
     public ScanPathsEditStorageItem(@NonNull Context context) {
@@ -65,6 +70,7 @@ public class ScanPathsEditStorageItem extends LinearLayout {
         infoView = new TextView(getContext());
 
         managerOfDialogs = new ManagerOfDialogs(getContext());
+        managerOfNotifications = new ManagerOfNotifications(getContext());
         convert = new Convert(getContext());
 
         LinearLayout.LayoutParams layoutParams = new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
@@ -132,13 +138,17 @@ public class ScanPathsEditStorageItem extends LinearLayout {
     }
 
     public void addPath(String path) {
-        if (path == null) {
+        path = path == null ? "" : path.trim();
+
+        if (path.isEmpty() || !ANDROID_PATH_PATTERN.matcher(path).matches()) {
+            managerOfNotifications.showToast(R.string.toast_invalid_path_value);
             return;
         }
 
-        path = path.trim();
+        path = path.endsWith("/") ? path : path + "/";
 
-        if (path.isEmpty()) {
+        if (storageParams != null && storageParams.paths != null && storageParams.paths.contains(path)) {
+            managerOfNotifications.showToast(R.string.toast_path_already_added);
             return;
         }
 
@@ -158,6 +168,8 @@ public class ScanPathsEditStorageItem extends LinearLayout {
         pathItem.setButtonDeleteClickListener(onButtonDeleteClick);
         pathsList.removeView(infoView);
         pathsList.addView(pathItem);
+
+        managerOfNotifications.showToast(R.string.toast_path_successfully_added);
     }
 
     private void setNoItemsInfo() {

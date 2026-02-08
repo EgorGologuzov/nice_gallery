@@ -429,6 +429,7 @@ public class ManagerOfFiles implements IManagerOfFiles {
             }
 
             for (String targetPath : targetPaths) {
+                targetPath = targetPath.endsWith("/") ? targetPath.substring(0, targetPath.length() - 1) : targetPath;
                 if (path.equals(targetPath)) {
                     return PATH_IS_TARGET;
                 }

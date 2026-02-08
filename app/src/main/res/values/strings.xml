@@ -48,6 +48,11 @@
     <string name="message_error_video_playing_failed">Ошибка при воспроизведении видео</string>
     <string name="message_error_file_properties_read_failed">Ошибка при чтении свойств файла</string>
 
+<!--Toasts-->
+    <string name="toast_invalid_path_value">Некорректный путь</string>
+    <string name="toast_path_successfully_added">Путь успешно добавлен</string>
+    <string name="toast_path_already_added">Путь уже добавлен</string>
+
 <!--Dialogs-->
     <string name="dialog_title_permission_required">Необходимо разрешение</string>
     <string name="dialog_title_scanning_report">Отчет о сканировании</string>
