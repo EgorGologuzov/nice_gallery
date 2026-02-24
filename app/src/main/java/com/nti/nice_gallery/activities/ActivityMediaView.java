@@ -2,6 +2,7 @@ package com.nti.nice_gallery.activities;
 
 import android.graphics.Bitmap;
 import android.graphics.Color;
+import android.graphics.Matrix;
 import android.media.MediaPlayer;
 import android.os.Bundle;
 import android.os.Handler;
@@ -9,6 +10,7 @@ import android.os.Looper;
 import android.util.Log;
 import android.view.GestureDetector;
 import android.view.MotionEvent;
+import android.view.ScaleGestureDetector;
 import android.view.SurfaceView;
 import android.view.View;
 import android.view.ViewGroup;
@@ -30,6 +32,8 @@ import com.nti.nice_gallery.utils.GestureListener;
 import com.nti.nice_gallery.utils.ManagerOfNavigation;
 import com.nti.nice_gallery.utils.ManagerOfNotifications;
 import com.nti.nice_gallery.utils.ManagerOfThreads;
+import com.nti.nice_gallery.utils.ManagerOfTime;
+import com.nti.nice_gallery.utils.ScaleGestureListener;
 import com.nti.nice_gallery.views.ViewActionBar;
 import com.nti.nice_gallery.views.buttons.ButtonFileInfo;
 import com.nti.nice_gallery.views.buttons.ButtonPlay;
@@ -55,6 +59,7 @@ public class ActivityMediaView extends AppCompatActivity {
     private static ConcurrentHashMap<Integer, Object> previewsLoadingInProgress;
     private static Consumer<Integer> previewLoadedListener;
     private static boolean isVideoPaused;
+    private static boolean isScaleModeEnabled;
     private static MediaPlayer mediaPlayer;
     private static Handler videoTickHandler;
 
@@ -78,6 +83,7 @@ public class ActivityMediaView extends AppCompatActivity {
         SeekBar seekBar = findViewById(R.id.seekBar);
         TextView timeView = findViewById(R.id.timeView);
         TextView infoView = findViewById(R.id.infoView);
+        TextView actionInfoView = findViewById(R.id.actionInfoView);
         FrameLayout previewLayout = findViewById(R.id.previewLayout);
         ImageView imageView = findViewById(R.id.imageView);
         ImageView imageView2 = findViewById(R.id.imageView2);
@@ -88,6 +94,7 @@ public class ActivityMediaView extends AppCompatActivity {
         ManagerOfFiles managerOfFiles = new ManagerOfFiles(this);
         ManagerOfThreads managerOfThreads = new ManagerOfThreads(this);
         ManagerOfNotifications managerOfNotifications = new ManagerOfNotifications(this);
+        ManagerOfTime managerOfTime = new ManagerOfTime(this);
 
         Runnable setDefaultState = () -> {
             files = null;
@@ -99,6 +106,7 @@ public class ActivityMediaView extends AppCompatActivity {
             previewsLoadingInProgress = new ConcurrentHashMap<>();
             previewLoadedListener = null;
             isVideoPaused = false;
+            isScaleModeEnabled = false;
             if (mediaPlayer != null) {
                 mediaPlayer.release();
                 mediaPlayer = null;
@@ -125,6 +133,25 @@ public class ActivityMediaView extends AppCompatActivity {
                 if (files != null && newPayload.startFile != null) {
                     int fileIndex = files.indexOf(newPayload.startFile);
                     currentFileIndex = fileIndex >= 0 ? fileIndex : -1;
+                }
+            }
+        };
+
+        Consumer<String> showActionInfo = new Consumer<String>() {
+            final int ACTION_MESSAGE_SHOW_DELAY_MS = 700;
+            Runnable lastAction;
+
+            @Override
+            public void accept(String message) {
+                if (message != null) {
+                    actionInfoView.setText(message);
+                    actionInfoView.setVisibility(View.VISIBLE);
+                    managerOfTime.cancelAction(lastAction);
+                    lastAction = () -> managerOfThreads.runOnUiThread(() -> actionInfoView.setVisibility(View.GONE));
+                    managerOfTime.doAction(lastAction, ACTION_MESSAGE_SHOW_DELAY_MS);
+                } else {
+                    actionInfoView.setVisibility(View.GONE);
+                    managerOfTime.cancelAction(lastAction);
                 }
             }
         };
@@ -551,11 +578,55 @@ public class ActivityMediaView extends AppCompatActivity {
             }
         };
 
+        Consumer<ScaleGestureListener.PinchArgs> onScaleGestureDetected = new Consumer<ScaleGestureListener.PinchArgs>() {
+            private float SCALE_THRESHOLD = 0.05f;
+
+            private Matrix imageMatrix = new Matrix();
+            private float[] matrixValues = new float[9];
+            private float minScale = 1f;
+            private float maxScale = 3.0f;
+
+            @Override
+            public void accept(ScaleGestureListener.PinchArgs pinchArgs) {
+                imageMatrix.getValues(matrixValues);
+                float currentScale = matrixValues[Matrix.MSCALE_X];
+
+                float newScale = currentScale * pinchArgs.scaleFactor;
+                newScale = Math.max(Math.min(newScale, maxScale), minScale);
+
+                if (newScale == minScale) {
+                    if (imageView.getScaleType() == ImageView.ScaleType.MATRIX) {
+                        imageView.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                        imageView.setImageMatrix(null); // Сбрасываем матрицу
+                        isScaleModeEnabled = false;
+                    }
+
+                    showActionInfo.accept(getString(R.string.format_scale, Math.round(minScale * 100)));
+
+                } else if (newScale >= minScale + SCALE_THRESHOLD || newScale < currentScale) {
+                    float adjustedScaleFactor = newScale / currentScale;
+
+                    imageMatrix.postScale(adjustedScaleFactor, adjustedScaleFactor,
+                            pinchArgs.focusX, pinchArgs.focusY);
+
+                    imageView.setScaleType(ImageView.ScaleType.MATRIX);
+                    imageView.setImageMatrix(imageMatrix);
+
+                    isScaleModeEnabled = true;
+
+                    showActionInfo.accept(getString(R.string.format_scale, Math.round(newScale * 100)));
+                }
+            }
+        };
+
         View.OnTouchListener onPreviewLayoutTouch = new View.OnTouchListener() {
             final GestureDetector gestureDetector = new GestureDetector(ActivityMediaView.this, new GestureListener(onGestureDetected));
+            final ScaleGestureDetector scaleGestureDetector = new ScaleGestureDetector(ActivityMediaView.this, new ScaleGestureListener(onScaleGestureDetected));
+
             @Override
             public boolean onTouch(View view, MotionEvent motionEvent) {
                 gestureDetector.onTouchEvent(motionEvent);
+                scaleGestureDetector.onTouchEvent(motionEvent);
                 return true;
             }
         };
@@ -578,6 +649,9 @@ public class ActivityMediaView extends AppCompatActivity {
                 mediaPlayer.pause();
                 unbindSurfaceFromMediaPlayer.run();
             }
+
+            showActionInfo.accept(null);
+            isScaleModeEnabled = false;
         };
 
         onActivityDestroy = () -> {

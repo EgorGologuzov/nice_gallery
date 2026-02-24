@@ -25,6 +25,8 @@
     <string name="format_storage_info">%s %s</string>
     <!--Counters-->
     <string name="format_counter_file_index_from_all_files">%d / %d</string>
+    <!--Scale-->
+    <string name="format_scale">%d%%</string>
 
 <!--Symbols-->
     <string name="symbol_dot_separator">" • "</string>

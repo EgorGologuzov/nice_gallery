@@ -15,7 +15,7 @@
         <ImageView
             android:id="@+id/imageView"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
+            android:layout_height="wrap_content"
             android:scaleType="fitCenter" />
         <ImageView
             android:id="@+id/imageView2"
@@ -28,6 +28,17 @@
             android:layout_height="match_parent"
             android:layout_gravity="center"
             android:visibility="gone" />
+        <TextView
+            android:id="@+id/actionInfoView"
+            style="@style/TextAppearance.AppCompat.Display1"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:padding="8dp"
+            android:layout_gravity="center"
+            android:background="@color/translucent_background"
+            android:textStyle="bold"
+            android:visibility="gone"
+            android:text="[Info]" />
 
     </FrameLayout>
 
