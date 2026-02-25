@@ -27,6 +27,9 @@
     <string name="format_counter_file_index_from_all_files">%d / %d</string>
     <!--Scale-->
     <string name="format_scale">%d%%</string>
+    <!--Rewind time-->
+    <string name="format_rewind_time_forward">+%d</string>
+    <string name="format_rewind_time_back">-%d</string>
 
 <!--Symbols-->
     <string name="symbol_dot_separator">" • "</string>

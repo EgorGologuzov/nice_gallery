@@ -39,6 +39,7 @@ import com.nti.nice_gallery.views.buttons.ButtonFileInfo;
 import com.nti.nice_gallery.views.buttons.ButtonPlay;
 
 import java.io.IOException;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
@@ -89,7 +90,7 @@ public class ActivityMediaView extends AppCompatActivity {
         FrameLayout previewLayout = findViewById(R.id.previewLayout);
         ImageView imageView = findViewById(R.id.imageView);
         ImageView imageView2 = findViewById(R.id.imageView2);
-        SurfaceView surfaceView = findViewById(R.id.surfaceView);
+        SurfaceView videoView = findViewById(R.id.surfaceView);
 
         Convert convert = new Convert(this);
         ManagerOfNavigation managerOfNavigation = new ManagerOfNavigation(this);
@@ -218,7 +219,7 @@ public class ActivityMediaView extends AppCompatActivity {
             float layoutRation = (float) layoutWidth / layoutHeight;
             float videoRatio = (float) videoWidth / videoHeight;
 
-            ViewGroup.LayoutParams layoutParams = surfaceView.getLayoutParams();
+            ViewGroup.LayoutParams layoutParams = videoView.getLayoutParams();
 
             if (videoRatio > layoutRation) {
                 layoutParams.width = layoutWidth;
@@ -228,8 +229,8 @@ public class ActivityMediaView extends AppCompatActivity {
                 layoutParams.height = layoutHeight;
             }
 
-            surfaceView.setLayoutParams(layoutParams);
-            surfaceView.requestLayout();
+            videoView.setLayoutParams(layoutParams);
+            videoView.requestLayout();
         };
 
         Runnable updateTimeBar = () -> {
@@ -304,7 +305,7 @@ public class ActivityMediaView extends AppCompatActivity {
             }
 
             isVideoPaused = false;
-            surfaceView.setVisibility(View.GONE);
+            videoView.setVisibility(View.GONE);
             buttonPlay.setState(ButtonPlay.State.Stop);
             destroyTimeBar.run();
         };
@@ -319,7 +320,7 @@ public class ActivityMediaView extends AppCompatActivity {
                 return;
             }
 
-            mediaPlayer.setDisplay(surfaceView.getHolder());
+            mediaPlayer.setDisplay(videoView.getHolder());
             mediaPlayer.setOnVideoSizeChangedListener((mp, videoWidth, videoHeight) -> adjustSurfaceSizeToVideoSize.run());
             mediaPlayer.setOnCompletionListener(mediaPlayer -> stopVideoIfPlaying.run());
             mediaPlayer.setOnErrorListener((mediaPlayer, i, i1) -> { onVideoPlayingError.run(); return true; });
@@ -362,8 +363,8 @@ public class ActivityMediaView extends AppCompatActivity {
 
             initTimeBar.run();
 
-            surfaceView.setVisibility(View.VISIBLE);
-            surfaceView.post(() -> {
+            videoView.setVisibility(View.VISIBLE);
+            videoView.post(() -> {
                 try {
                     mediaPlayer = new MediaPlayer();
                     mediaPlayer.setDataSource(currentFile.path);
@@ -384,8 +385,8 @@ public class ActivityMediaView extends AppCompatActivity {
 
             initTimeBar.run();
 
-            surfaceView.setVisibility(View.VISIBLE);
-            surfaceView.post(() -> {
+            videoView.setVisibility(View.VISIBLE);
+            videoView.post(() -> {
                 bindSurfaceToMediaPlayer.run();
                 if (!isVideoPaused) {
                     mediaPlayer.start();
@@ -397,6 +398,36 @@ public class ActivityMediaView extends AppCompatActivity {
             if (mediaPlayer != null && !isVideoPaused) {
                 isVideoPaused = true;
                 mediaPlayer.pause();
+            }
+        };
+
+        Consumer<Integer> rewindVideo = new Consumer<Integer>() {
+            final int ACTION_MESSAGE_SHOW_DELAY_MS = 700;
+            private Long lastRewindTime;
+            private int accumulatedTime = 0;
+
+            @Override
+            public void accept(Integer millis) {
+                if (mediaPlayer == null) {
+                    return;
+                }
+
+                if (lastRewindTime == null || (System.currentTimeMillis() - lastRewindTime) < ACTION_MESSAGE_SHOW_DELAY_MS) {
+                    accumulatedTime += Math.round((float) millis / 1000);
+                } else {
+                    accumulatedTime = Math.round((float) millis / 1000);
+                }
+
+                String accumulatedTimeStr;
+                if (accumulatedTime >= 0) {
+                    accumulatedTimeStr = getString(R.string.format_rewind_time_forward, Math.abs(accumulatedTime));
+                } else {
+                    accumulatedTimeStr = getString(R.string.format_rewind_time_back, Math.abs(accumulatedTime));
+                }
+
+                mediaPlayer.seekTo(mediaPlayer.getCurrentPosition() + millis);
+                lastRewindTime = System.currentTimeMillis();
+                showActionInfo.accept(accumulatedTimeStr);
             }
         };
 
@@ -466,6 +497,36 @@ public class ActivityMediaView extends AppCompatActivity {
                 return;
             }
 
+            Consumer<Integer> loadFileToCache = fileIndex -> {
+                if (fileIndex < 0 ||
+                        fileIndex >= files.size() ||
+                        cachedPreviews.containsKey(fileIndex) ||
+                        previewsLoadingInProgress.containsKey(fileIndex)
+                ) {
+                    return;
+                }
+
+                final int indexFinal = fileIndex;
+                final ModelMediaFile file = files.get(indexFinal);
+
+                ModelGetPreviewRequest previewRequest = new ModelGetPreviewRequest(
+                        files.get(indexFinal),
+                        file.width,
+                        file.height
+                );
+
+                previewsLoadingInProgress.put(indexFinal, new Object());
+
+                managerOfFiles.getPreviewAsync(previewRequest, response -> {
+                    Bitmap preview = response != null ? response.preview : null;
+                    cachedPreviews.put(indexFinal, preview != null ? preview : EMPTY);
+                    previewsLoadingInProgress.remove(indexFinal);
+                    if (previewLoadedListener != null) {
+                        previewLoadedListener.accept(indexFinal);
+                    }
+                });
+            };
+
             Runnable updateCache = () -> {
                 final int MAX_PREVIEW_CASH_SIZE = 4;
                 final boolean CLEAR_CACHE = false;
@@ -479,35 +540,9 @@ public class ActivityMediaView extends AppCompatActivity {
                 final int startIndex = currentFileIndex - (MAX_PREVIEW_CASH_SIZE / 2);
                 final int endIndex = currentFileIndex + (MAX_PREVIEW_CASH_SIZE / 2);
 
+                loadFileToCache.accept(currentFileIndex);
                 for (int fileIndex = startIndex; fileIndex <= endIndex; fileIndex++) {
-
-                    if (fileIndex < 0 ||
-                            fileIndex >= files.size() ||
-                            cachedPreviews.containsKey(fileIndex) ||
-                            previewsLoadingInProgress.containsKey(fileIndex)
-                    ) {
-                        continue;
-                    }
-
-                    final int indexFinal = fileIndex;
-                    final ModelMediaFile file = files.get(indexFinal);
-
-                    ModelGetPreviewRequest previewRequest = new ModelGetPreviewRequest(
-                            files.get(indexFinal),
-                            file.width,
-                            file.height
-                    );
-
-                    previewsLoadingInProgress.put(indexFinal, new Object());
-
-                    managerOfFiles.getPreviewAsync(previewRequest, response -> {
-                        Bitmap preview = response != null ? response.preview : null;
-                        cachedPreviews.put(indexFinal, preview != null ? preview : EMPTY);
-                        previewsLoadingInProgress.remove(indexFinal);
-                        if (previewLoadedListener != null) {
-                            previewLoadedListener.accept(indexFinal);
-                        }
-                    });
+                    loadFileToCache.accept(fileIndex);
                 }
             };
 
@@ -579,10 +614,6 @@ public class ActivityMediaView extends AppCompatActivity {
 
             @Override
             public Object invoke(Float scaleFactor, Float focusX, Float focusY) {
-                if (mediaPlayer != null && mediaPlayer.isPlaying() || isVideoPaused) {
-                    return null;
-                }
-
                 Matrix imageMatrix;
                 float[] matrixValues = new float[9];
 
@@ -657,6 +688,7 @@ public class ActivityMediaView extends AppCompatActivity {
 
         Consumer<GestureListener.GestureArgs> onGestureDetected = new Consumer<GestureListener.GestureArgs>() {
             private final float DOUBLE_TAP_SCALE_FACTOR = 3f;
+            private final int DOUBLE_TAP_VIDEO_REWIND_MILLIS = 10_000;
 
             @Override
             public void accept(GestureListener.GestureArgs gestureArgs) {
@@ -666,24 +698,48 @@ public class ActivityMediaView extends AppCompatActivity {
                 if (gestureArgs.gesture == GestureListener.Gesture.Tap) {
                     isToolPanelsVisible = !isToolPanelsVisible;
                     onUpdateToolPanelsVisibility.run();
+                    return;
                 }
                 if (imageView.getScaleType() != ImageView.ScaleType.MATRIX) {
                     if (gestureArgs.gesture == GestureListener.Gesture.SwipeRight) {
                         stepBack.run();
+                        return;
                     }
                     if (gestureArgs.gesture == GestureListener.Gesture.SwipeLeft) {
                         stepForward.run();
+                        return;
                     }
+                    if (gestureArgs.gesture == GestureListener.Gesture.SwipeUp) {
+                        buttonFileInfo.showInfo();
+                        return;
+                    }
+                    if (gestureArgs.gesture == GestureListener.Gesture.SwipeDown) {
+                        managerOfNavigation.navigateBack();
+                        return;
+                    }
+                }
+                if (videoView.getVisibility() == View.VISIBLE) {
+                    if (gestureArgs.gesture == GestureListener.Gesture.DoubleTap) {
+                        int screenWidth = previewLayout.getWidth();
+                        int rewindMillis = screenWidth / 2f < gestureArgs.tapX ? DOUBLE_TAP_VIDEO_REWIND_MILLIS : -DOUBLE_TAP_VIDEO_REWIND_MILLIS;
+                        rewindVideo.accept(rewindMillis);
+                        return;
+                    }
+                }
+                if (imageView.getScaleType() != ImageView.ScaleType.MATRIX && videoView.getVisibility() != View.VISIBLE) {
                     if (gestureArgs.gesture == GestureListener.Gesture.DoubleTap) {
                         scalePreview.invoke(DOUBLE_TAP_SCALE_FACTOR, (float) gestureArgs.tapX, (float) gestureArgs.tapY);
+                        return;
                     }
-                } else {
+                }
+                if (imageView.getScaleType() == ImageView.ScaleType.MATRIX && videoView.getVisibility() != View.VISIBLE) {
                     if (gestureArgs.gesture == GestureListener.Gesture.Scroll) {
-                        Log.d(LOG_TAG, gestureArgs.scrollDistX + " | " + gestureArgs.scrollDistY);
                         moveImage(gestureArgs.scrollDistX, gestureArgs.scrollDistY);
+                        return;
                     }
                     if (gestureArgs.gesture == GestureListener.Gesture.DoubleTap) {
                         resetPreviewScale.run();
+                        return;
                     }
                 }
             }

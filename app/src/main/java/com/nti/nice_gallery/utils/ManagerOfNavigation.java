@@ -37,6 +37,15 @@ public class ManagerOfNavigation {
         context.startActivity(intent);
     }
 
+    public void navigateBack() {
+        if (!(context instanceof Activity)) {
+            throw new IllegalStateException();
+        }
+
+        Activity activity = (Activity) context;
+        activity.onBackPressed();
+    }
+
     public Object getPayload() {
         if (!(context instanceof Activity)) {
             throw new IllegalStateException();

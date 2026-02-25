@@ -41,7 +41,7 @@ public class ButtonFileInfo extends ButtonBase {
         this.file = file;
     }
 
-    private void onClick() {
+    public void showInfo() {
         if (file == null) {
             return;
         }
@@ -72,5 +72,9 @@ public class ButtonFileInfo extends ButtonBase {
 
         String info = String.join("\n\n", infoItems);
         managerOfDialogs.showInfo(R.string.dialog_title_file_properties, info);
+    }
+
+    private void onClick() {
+        showInfo();
     }
 }
