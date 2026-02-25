@@ -9,23 +9,50 @@ import java.util.function.Consumer;
 
 public class GestureListener extends GestureDetector.SimpleOnGestureListener {
 
-    public enum Gesture { Tap, DoubleTap, LongPress, SwipeLeft, SwipeRight, SwipeUp, SwipeDown }
+    public enum Gesture { Tap, DoubleTap, LongPress, SwipeLeft, SwipeRight, SwipeUp, SwipeDown, Scroll}
 
-    private static final int SWIPE_THRESHOLD = 100;
-    private static final int SWIPE_VELOCITY_THRESHOLD = 100;
+    public static class GestureArgs {
+        public final Gesture gesture;
+        public final Integer tapX;
+        public final Integer tapY;
+        public final Integer scrollDistX;
+        public final Integer scrollDistY;
+
+        public GestureArgs(
+                Gesture gesture,
+                Integer tapX,
+                Integer tapY,
+                Integer scrollDistX,
+                Integer scrollDistY
+        ) {
+            this.gesture = gesture;
+            this.tapX = tapX;
+            this.tapY = tapY;
+            this.scrollDistX = scrollDistX;
+            this.scrollDistY = scrollDistY;
+        }
+    }
 
     private float downX;
     private float downY;
-    private final Consumer<Gesture> gestureDetectedListener;
+    private final Consumer<GestureArgs> gestureDetectedListener;
 
-    public GestureListener(Consumer<Gesture> gestureDetectedListener) {
+    public GestureListener(Consumer<GestureArgs> gestureDetectedListener) {
         this.gestureDetectedListener = gestureDetectedListener;
     }
 
     @Override
     public boolean onSingleTapConfirmed(MotionEvent e) {
         if (gestureDetectedListener != null) {
-            gestureDetectedListener.accept(Gesture.Tap);
+            GestureArgs gestureArgs = new GestureArgs(
+                    Gesture.Tap,
+                    (int) e.getX(),
+                    (int) e.getY(),
+                    null,
+                    null
+            );
+
+            gestureDetectedListener.accept(gestureArgs);
         }
 
         return true;
@@ -34,7 +61,15 @@ public class GestureListener extends GestureDetector.SimpleOnGestureListener {
     @Override
     public boolean onDoubleTap(MotionEvent e) {
         if (gestureDetectedListener != null) {
-            gestureDetectedListener.accept(Gesture.DoubleTap);
+            GestureArgs gestureArgs = new GestureArgs(
+                    Gesture.DoubleTap,
+                    (int) e.getX(),
+                    (int) e.getY(),
+                    null,
+                    null
+            );
+
+            gestureDetectedListener.accept(gestureArgs);
         }
 
         return true;
@@ -43,12 +78,23 @@ public class GestureListener extends GestureDetector.SimpleOnGestureListener {
     @Override
     public void onLongPress(@NonNull MotionEvent e) {
         if (gestureDetectedListener != null) {
-            gestureDetectedListener.accept(Gesture.LongPress);
+            GestureArgs gestureArgs = new GestureArgs(
+                    Gesture.LongPress,
+                    (int) e.getX(),
+                    (int) e.getY(),
+                    null,
+                    null
+            );
+
+            gestureDetectedListener.accept(gestureArgs);
         }
     }
 
     @Override
     public boolean onFling(MotionEvent e1, @NonNull MotionEvent e2, float velocityX, float velocityY) {
+        final int SWIPE_THRESHOLD = 100;
+        final int SWIPE_VELOCITY_THRESHOLD = 100;
+
         float diffX = e2.getX() - downX;
         float diffY = e2.getY() - downY;
 
@@ -69,11 +115,35 @@ public class GestureListener extends GestureDetector.SimpleOnGestureListener {
         }
 
         if (gesture != null && gestureDetectedListener != null) {
-            gestureDetectedListener.accept(gesture);
+            GestureArgs gestureArgs = new GestureArgs(
+                    gesture,
+                    null,
+                    null,
+                    null,
+                    null
+            );
+
+            gestureDetectedListener.accept(gestureArgs);
             return true;
         }
 
         return false;
+    }
+
+    @Override
+    public boolean onScroll(MotionEvent e1, @NonNull MotionEvent e2, float distanceX, float distanceY) {
+        if (gestureDetectedListener != null) {
+            GestureArgs gestureArgs = new GestureArgs(
+                    Gesture.Scroll,
+                    null,
+                    null,
+                    (int) -distanceX,
+                    (int) -distanceY
+            );
+
+            gestureDetectedListener.accept(gestureArgs);
+        }
+        return true;
     }
 
     @Override

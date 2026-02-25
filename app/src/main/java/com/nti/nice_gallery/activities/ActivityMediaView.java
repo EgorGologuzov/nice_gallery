@@ -43,7 +43,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.stream.Collectors;
+
+import kotlin.jvm.functions.Function3;
 
 public class ActivityMediaView extends AppCompatActivity {
 
@@ -59,7 +62,6 @@ public class ActivityMediaView extends AppCompatActivity {
     private static ConcurrentHashMap<Integer, Object> previewsLoadingInProgress;
     private static Consumer<Integer> previewLoadedListener;
     private static boolean isVideoPaused;
-    private static boolean isScaleModeEnabled;
     private static MediaPlayer mediaPlayer;
     private static Handler videoTickHandler;
 
@@ -106,7 +108,6 @@ public class ActivityMediaView extends AppCompatActivity {
             previewsLoadingInProgress = new ConcurrentHashMap<>();
             previewLoadedListener = null;
             isVideoPaused = false;
-            isScaleModeEnabled = false;
             if (mediaPlayer != null) {
                 mediaPlayer.release();
                 mediaPlayer = null;
@@ -335,12 +336,21 @@ public class ActivityMediaView extends AppCompatActivity {
             mediaPlayer.setOnErrorListener(null);
         };
 
+        Runnable resetPreviewScale = () -> {
+            if (imageView.getScaleType() != ImageView.ScaleType.FIT_CENTER) {
+                imageView.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                showActionInfo.accept(getString(R.string.format_scale, 100));
+            }
+        };
+
         Runnable startVideo = () -> {
             ModelMediaFile currentFile = files.get(currentFileIndex);
 
             if (!currentFile.isVideo || currentFile.duration == null) {
                 return;
             }
+
+            resetPreviewScale.run();
 
             if (mediaPlayer != null) {
                 if (!mediaPlayer.isPlaying()) {
@@ -562,61 +572,162 @@ public class ActivityMediaView extends AppCompatActivity {
             showCurrentFile.run();
         };
 
-        Consumer<GestureListener.Gesture> onGestureDetected = gesture -> {
-            if (isBusy) {
-                return;
-            }
-            if (gesture == GestureListener.Gesture.SwipeRight) {
-                stepBack.run();
-            }
-            if (gesture == GestureListener.Gesture.SwipeLeft) {
-                stepForward.run();
-            }
-            if (gesture == GestureListener.Gesture.Tap) {
-                isToolPanelsVisible = !isToolPanelsVisible;
-                onUpdateToolPanelsVisibility.run();
-            }
-        };
-
-        Consumer<ScaleGestureListener.PinchArgs> onScaleGestureDetected = new Consumer<ScaleGestureListener.PinchArgs>() {
-            private float SCALE_THRESHOLD = 0.05f;
-
-            private Matrix imageMatrix = new Matrix();
-            private float[] matrixValues = new float[9];
-            private float minScale = 1f;
-            private float maxScale = 3.0f;
+        Function3<Float, Float, Float, Object> scalePreview = new Function3<Float, Float, Float, Object>() {
+            private final float MAX_SCALE_FACTOR = 5f;
+            private float minScale;
+            private float maxScale;
 
             @Override
-            public void accept(ScaleGestureListener.PinchArgs pinchArgs) {
+            public Object invoke(Float scaleFactor, Float focusX, Float focusY) {
+                if (mediaPlayer != null && mediaPlayer.isPlaying() || isVideoPaused) {
+                    return null;
+                }
+
+                Matrix imageMatrix;
+                float[] matrixValues = new float[9];
+
+                // 1. Инициализация при первом жесте
+                if (imageView.getScaleType() != ImageView.ScaleType.MATRIX) {
+                    imageMatrix = setupInitialMatrix();
+                } else {
+                    imageMatrix = imageView.getImageMatrix();
+                }
+
                 imageMatrix.getValues(matrixValues);
                 float currentScale = matrixValues[Matrix.MSCALE_X];
 
-                float newScale = currentScale * pinchArgs.scaleFactor;
-                newScale = Math.max(Math.min(newScale, maxScale), minScale);
+                // 2. Вычисляем новый масштаб
+                float newScale = currentScale * scaleFactor;
 
-                if (newScale == minScale) {
-                    if (imageView.getScaleType() == ImageView.ScaleType.MATRIX) {
-                        imageView.setScaleType(ImageView.ScaleType.FIT_CENTER);
-                        imageView.setImageMatrix(null); // Сбрасываем матрицу
-                        isScaleModeEnabled = false;
+                // Ограничиваем масштаб
+                if (newScale < minScale) newScale = minScale;
+                if (newScale > maxScale) newScale = maxScale;
+
+                // 3. Логика сброса (если масштаб вернулся к минимальному)
+                if (newScale <= minScale) {
+                    resetPreviewScale.run();
+                    return null;
+                }
+
+                // 4. Применяем трансформацию
+                float adjustedScaleFactor = newScale / currentScale;
+                imageMatrix.postScale(adjustedScaleFactor, adjustedScaleFactor, focusX, focusY);
+
+                imageView.setImageMatrix(imageMatrix);
+
+                // Показываем процент относительно базового размера (FIT_CENTER = 100%)
+                int displayPercent = Math.round((newScale / minScale) * 100);
+                showActionInfo.accept(getString(R.string.format_scale, displayPercent));
+
+                return null;
+            }
+
+            private Matrix setupInitialMatrix() {
+                Matrix imageMatrix = new Matrix();
+
+                if (imageView.getDrawable() == null) return imageMatrix;
+
+                float dWidth = imageView.getDrawable().getIntrinsicWidth();
+                float dHeight = imageView.getDrawable().getIntrinsicHeight();
+                float vWidth = imageView.getWidth();
+                float vHeight = imageView.getHeight();
+
+                // Вычисляем масштаб для FIT_CENTER
+                float scaleX = vWidth / dWidth;
+                float scaleY = vHeight / dHeight;
+                float baseScale = Math.min(scaleX, scaleY);
+
+                minScale = baseScale;
+                maxScale = baseScale * MAX_SCALE_FACTOR;
+
+                // Устанавливаем начальную матрицу равной текущему FIT_CENTER
+                imageMatrix.reset();
+                imageMatrix.postScale(baseScale, baseScale);
+
+                // Центрируем изображение
+                float dx = (vWidth - dWidth * baseScale) / 2f;
+                float dy = (vHeight - dHeight * baseScale) / 2f;
+                imageMatrix.postTranslate(dx, dy);
+
+                imageView.setScaleType(ImageView.ScaleType.MATRIX);
+
+                return imageMatrix;
+            }
+        };
+
+        Consumer<GestureListener.GestureArgs> onGestureDetected = new Consumer<GestureListener.GestureArgs>() {
+            private final float DOUBLE_TAP_SCALE_FACTOR = 3f;
+
+            @Override
+            public void accept(GestureListener.GestureArgs gestureArgs) {
+                if (isBusy) {
+                    return;
+                }
+                if (gestureArgs.gesture == GestureListener.Gesture.Tap) {
+                    isToolPanelsVisible = !isToolPanelsVisible;
+                    onUpdateToolPanelsVisibility.run();
+                }
+                if (imageView.getScaleType() != ImageView.ScaleType.MATRIX) {
+                    if (gestureArgs.gesture == GestureListener.Gesture.SwipeRight) {
+                        stepBack.run();
                     }
-
-                    showActionInfo.accept(getString(R.string.format_scale, Math.round(minScale * 100)));
-
-                } else if (newScale >= minScale + SCALE_THRESHOLD || newScale < currentScale) {
-                    float adjustedScaleFactor = newScale / currentScale;
-
-                    imageMatrix.postScale(adjustedScaleFactor, adjustedScaleFactor,
-                            pinchArgs.focusX, pinchArgs.focusY);
-
-                    imageView.setScaleType(ImageView.ScaleType.MATRIX);
-                    imageView.setImageMatrix(imageMatrix);
-
-                    isScaleModeEnabled = true;
-
-                    showActionInfo.accept(getString(R.string.format_scale, Math.round(newScale * 100)));
+                    if (gestureArgs.gesture == GestureListener.Gesture.SwipeLeft) {
+                        stepForward.run();
+                    }
+                    if (gestureArgs.gesture == GestureListener.Gesture.DoubleTap) {
+                        scalePreview.invoke(DOUBLE_TAP_SCALE_FACTOR, (float) gestureArgs.tapX, (float) gestureArgs.tapY);
+                    }
+                } else {
+                    if (gestureArgs.gesture == GestureListener.Gesture.Scroll) {
+                        Log.d(LOG_TAG, gestureArgs.scrollDistX + " | " + gestureArgs.scrollDistY);
+                        moveImage(gestureArgs.scrollDistX, gestureArgs.scrollDistY);
+                    }
+                    if (gestureArgs.gesture == GestureListener.Gesture.DoubleTap) {
+                        resetPreviewScale.run();
+                    }
                 }
             }
+
+            private void moveImage(float deltaX, float deltaY) {
+                Matrix matrix = new Matrix(imageView.getImageMatrix());
+                float[] values = new float[9];
+                matrix.getValues(values);
+
+                float transX = values[Matrix.MTRANS_X];
+                float transY = values[Matrix.MTRANS_Y];
+                float scaleX = values[Matrix.MSCALE_X];
+                float scaleY = values[Matrix.MSCALE_Y];
+
+                float imageWidth = imageView.getDrawable().getIntrinsicWidth() * scaleX;
+                float imageHeight = imageView.getDrawable().getIntrinsicHeight() * scaleY;
+                float viewWidth = imageView.getWidth();
+                float viewHeight = imageView.getHeight();
+
+                // Логика по горизонтали
+                if (imageWidth > viewWidth) {
+                    // Ограничиваем, чтобы не вылезти за левый и правый края
+                    if (transX + deltaX > 0) deltaX = -transX;
+                    else if (transX + deltaX < viewWidth - imageWidth) deltaX = viewWidth - imageWidth - transX;
+                } else {
+                    deltaX = 0; // Если картинка уже меньше экрана, не двигаем
+                }
+
+                // Логика по вертикали
+                if (imageHeight > viewHeight) {
+                    // Ограничиваем, чтобы не вылезти за верхний и нижний края
+                    if (transY + deltaY > 0) deltaY = -transY;
+                    else if (transY + deltaY < viewHeight - imageHeight) deltaY = viewHeight - imageHeight - transY;
+                } else {
+                    deltaY = 0; // Если картинка меньше экрана, не двигаем
+                }
+
+                matrix.postTranslate(deltaX, deltaY);
+                imageView.setImageMatrix(matrix);
+            }
+        };
+
+        Consumer<ScaleGestureListener.PinchArgs> onScaleGestureDetected = pinchArgs -> {
+            scalePreview.invoke(pinchArgs.scaleFactor, pinchArgs.focusX, pinchArgs.focusY);
         };
 
         View.OnTouchListener onPreviewLayoutTouch = new View.OnTouchListener() {
@@ -651,7 +762,6 @@ public class ActivityMediaView extends AppCompatActivity {
             }
 
             showActionInfo.accept(null);
-            isScaleModeEnabled = false;
         };
 
         onActivityDestroy = () -> {
