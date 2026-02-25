@@ -6,6 +6,7 @@ import com.nti.nice_gallery.utils.ReadOnlyList;
 
 import java.time.LocalDateTime;
 import java.util.Date;
+import java.util.Objects;
 
 public class ModelMediaFile {
 
@@ -87,6 +88,7 @@ public class ModelMediaFile {
     public final boolean isVideo;
     public final boolean isFolder;
     public final boolean isStorage;
+    public final boolean isAnimatedImage;
 
     public ModelMediaFile(
             String name,
@@ -127,5 +129,7 @@ public class ModelMediaFile {
         isVideo = type == Type.Video;
         isFolder = type == Type.Folder;
         isStorage = type == Type.Storage;
+        isAnimatedImage = type == Type.Image && (extension != null && extension.equalsIgnoreCase("gif")
+                || extension != null && extension.equalsIgnoreCase("webp"));
     }
 }

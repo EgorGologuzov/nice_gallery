@@ -1,22 +1,17 @@
 package com.nti.nice_gallery.views.grid_items;
 
 import android.content.Context;
-import android.graphics.Bitmap;
 import android.util.Log;
-import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
-import androidx.annotation.DrawableRes;
 import androidx.annotation.NonNull;
-import androidx.constraintlayout.widget.ConstraintLayout;
 
 import com.nti.nice_gallery.R;
 import com.nti.nice_gallery.data.Domain;
 import com.nti.nice_gallery.data.IManagerOfFiles;
 import com.nti.nice_gallery.models.ModelGetPreviewRequest;
-import com.nti.nice_gallery.models.ModelMediaFile;
 import com.nti.nice_gallery.utils.Convert;
 import com.nti.nice_gallery.utils.ManagerOfThreads;
 
@@ -92,8 +87,8 @@ public class GridItemQuilt extends GridItemBase {
 
                 managerOfFiles.getPreviewAsync(previewRequest, response -> {
                     managerOfThreads.runOnUiThread(() -> {
-                        if (response != null && response.preview != null) {
-                            imageView.setImageBitmap(response.preview);
+                        if (response != null && response.previewBitmap != null) {
+                            imageView.setImageBitmap(response.previewBitmap);
                         } else {
                             imageView.setImageResource(R.drawable.baseline_error_24_orange_700);
                         }

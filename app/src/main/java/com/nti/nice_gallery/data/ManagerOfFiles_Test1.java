@@ -226,7 +226,7 @@ public class ManagerOfFiles_Test1 implements IManagerOfFiles {
     @Override
     public void getPreviewAsync(ModelGetPreviewRequest request, Consumer<ModelGetPreviewResponse> callback) {
         if (request == null) {
-            managerOfThreads.safeAccept(callback, new ModelGetPreviewResponse(null));
+            managerOfThreads.safeAccept(callback, new ModelGetPreviewResponse(null, null));
             return;
         }
 
@@ -241,7 +241,8 @@ public class ManagerOfFiles_Test1 implements IManagerOfFiles {
         }
 
         ModelGetPreviewResponse response = new ModelGetPreviewResponse(
-                bitmap
+                bitmap,
+                null
         );
 
         managerOfThreads.safeAccept(callback, response);

@@ -1,13 +1,11 @@
 package com.nti.nice_gallery.views.grid_items;
 
 import android.content.Context;
-import android.graphics.Bitmap;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.widget.ImageView;
 import android.widget.TextView;
 
-import androidx.annotation.DrawableRes;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
@@ -98,12 +96,17 @@ public class GridItemLine extends GridItemBase {
 
             info = String.join(getContext().getResources().getString(R.string.symbol_dot_separator), infoItems);
 
-            if (model.type == ModelMediaFile.Type.Video) {
+            if (model.isVideo) {
                 infoItems.clear();
                 infoItems.add(getContext().getResources().getString(R.string.symbol_play_video));
                 infoItems.add(convert.durationToTimeString(model.duration));
                 info2 = String.join(getContext().getResources().getString(R.string.symbol_dot_separator), infoItems);
                 infoView2Visibility = VISIBLE;
+            }
+
+            if (model.isImage) {
+                info2 = model.extension != null ? model.extension.toUpperCase() : null;
+                infoView2Visibility = model.extension != null ? VISIBLE : GONE;
             }
         } catch (Exception e) {
             Log.e(LOG_TAG, e.getMessage());
@@ -130,8 +133,8 @@ public class GridItemLine extends GridItemBase {
 
                 managerOfFiles.getPreviewAsync(previewRequest, response -> {
                     managerOfThreads.runOnUiThread(() -> {
-                        if (response != null && response.preview != null) {
-                            imageView.setImageBitmap(response.preview);
+                        if (response != null && response.previewBitmap != null) {
+                            imageView.setImageBitmap(response.previewBitmap);
                         } else {
                             imageView.setImageResource(R.drawable.baseline_error_24_orange_700);
                         }

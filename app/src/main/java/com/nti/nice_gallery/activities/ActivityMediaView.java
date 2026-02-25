@@ -3,6 +3,8 @@ package com.nti.nice_gallery.activities;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.Matrix;
+import android.graphics.drawable.AnimatedImageDrawable;
+import android.graphics.drawable.Drawable;
 import android.media.MediaPlayer;
 import android.os.Bundle;
 import android.os.Handler;
@@ -26,6 +28,7 @@ import com.nti.nice_gallery.R;
 import com.nti.nice_gallery.data.ManagerOfFiles;
 import com.nti.nice_gallery.models.ModelGetFilesResponse;
 import com.nti.nice_gallery.models.ModelGetPreviewRequest;
+import com.nti.nice_gallery.models.ModelGetPreviewResponse;
 import com.nti.nice_gallery.models.ModelMediaFile;
 import com.nti.nice_gallery.utils.Convert;
 import com.nti.nice_gallery.utils.GestureListener;
@@ -39,12 +42,10 @@ import com.nti.nice_gallery.views.buttons.ButtonFileInfo;
 import com.nti.nice_gallery.views.buttons.ButtonPlay;
 
 import java.io.IOException;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import kotlin.jvm.functions.Function3;
@@ -52,7 +53,6 @@ import kotlin.jvm.functions.Function3;
 public class ActivityMediaView extends AppCompatActivity {
 
     private static final String LOG_TAG = "ActivityMediaView";
-    private static final Object EMPTY = new Object();
 
     private static int currentFileIndex;
     private static int pastFileIndex;
@@ -431,16 +431,29 @@ public class ActivityMediaView extends AppCompatActivity {
             }
         };
 
-        Consumer<Bitmap> setPreviewAndAnimate = preview -> {
+        Consumer<Object> setPreviewAndAnimate = previewResponse -> {
             final int ANIMATION_DURATION = 200;
+            final ModelGetPreviewResponse response = (ModelGetPreviewResponse) previewResponse;
+
+            Bitmap previewBitmap = response.previewBitmap;
+            Drawable previewDrawable = response.previewDrawable;
 
             Consumer<ImageView> setPreview = iv -> {
-                if (preview != null) {
+                if (previewDrawable != null) {
                     iv.setBackgroundColor(Color.TRANSPARENT);
-                    iv.setImageBitmap(preview);
+                    iv.setImageDrawable(previewDrawable);
+                } else if (previewBitmap != null) {
+                    iv.setBackgroundColor(Color.TRANSPARENT);
+                    iv.setImageBitmap(previewBitmap);
                 } else {
                     iv.setBackgroundColor(getColor(R.color.orange_200));
                     iv.setImageResource(R.drawable.baseline_error_24_orange_700);
+                }
+            };
+
+            Runnable startAnimationForAnimatedImage = () -> {
+                if (previewDrawable instanceof AnimatedImageDrawable) {
+                    ((AnimatedImageDrawable) previewDrawable).start();
                 }
             };
 
@@ -460,6 +473,7 @@ public class ActivityMediaView extends AppCompatActivity {
                     finishX1 = 0;
                 } else {
                     setPreview.accept(imageView);
+                    startAnimationForAnimatedImage.run();
                     return;
                 }
 
@@ -477,6 +491,7 @@ public class ActivityMediaView extends AppCompatActivity {
                         .setDuration(ANIMATION_DURATION)
                         .withEndAction(() -> {
                             setPreview.accept(imageView);
+                            startAnimationForAnimatedImage.run();
                             imageView.setTranslationX(finishX1);
                             imageView2.setVisibility(View.INVISIBLE);
                         })
@@ -485,6 +500,7 @@ public class ActivityMediaView extends AppCompatActivity {
 
             if (pastFileIndex < 0 || pastFileIndex == currentFileIndex) {
                 setPreview.accept(imageView);
+                startAnimationForAnimatedImage.run();
             } else {
                 runAnimation.run();
             }
@@ -518,8 +534,7 @@ public class ActivityMediaView extends AppCompatActivity {
                 previewsLoadingInProgress.put(indexFinal, new Object());
 
                 managerOfFiles.getPreviewAsync(previewRequest, response -> {
-                    Bitmap preview = response != null ? response.preview : null;
-                    cachedPreviews.put(indexFinal, preview != null ? preview : EMPTY);
+                    cachedPreviews.put(indexFinal, response);
                     previewsLoadingInProgress.remove(indexFinal);
                     if (previewLoadedListener != null) {
                         previewLoadedListener.accept(indexFinal);
@@ -549,8 +564,7 @@ public class ActivityMediaView extends AppCompatActivity {
             Runnable loadCurrentFilePreview = () -> {
 
                 if (cachedPreviews.containsKey(currentFileIndex)) {
-                    Object cachedValue = cachedPreviews.get(currentFileIndex);
-                    Bitmap preview = cachedValue instanceof Bitmap ? (Bitmap) cachedValue : null;
+                    Object preview = cachedPreviews.get(currentFileIndex);
                     setPreviewAndAnimate.accept(preview);
                     return;
                 }
@@ -563,12 +577,9 @@ public class ActivityMediaView extends AppCompatActivity {
                         return;
                     }
 
-                    Object cachedValue = cachedPreviews.get(currentFileIndex);
-                    Bitmap preview = cachedValue instanceof Bitmap ? (Bitmap) cachedValue : null;
-
+                    Object previewResponse = cachedPreviews.get(currentFileIndex);
                     managerOfThreads.runOnUiThread(() -> {
-                        setPreviewAndAnimate.accept(preview);
-
+                        setPreviewAndAnimate.accept(previewResponse);
                         isBusy = false;
                         onUpdateIsBusy.run();
                     });
@@ -783,7 +794,9 @@ public class ActivityMediaView extends AppCompatActivity {
         };
 
         Consumer<ScaleGestureListener.PinchArgs> onScaleGestureDetected = pinchArgs -> {
-            scalePreview.invoke(pinchArgs.scaleFactor, pinchArgs.focusX, pinchArgs.focusY);
+            if (videoView.getVisibility() != View.VISIBLE) {
+                scalePreview.invoke(pinchArgs.scaleFactor, pinchArgs.focusX, pinchArgs.focusY);
+            }
         };
 
         View.OnTouchListener onPreviewLayoutTouch = new View.OnTouchListener() {

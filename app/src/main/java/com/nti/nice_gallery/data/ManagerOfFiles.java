@@ -4,7 +4,9 @@ import android.app.usage.StorageStatsManager;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.ImageDecoder;
 import android.graphics.Matrix;
+import android.graphics.drawable.Drawable;
 import android.media.ExifInterface;
 import android.media.MediaMetadataRetriever;
 import android.os.storage.StorageManager;
@@ -329,7 +331,7 @@ public class ManagerOfFiles implements IManagerOfFiles {
         final ModelGetPreviewRequest requestFinal = request == null ? DEFAULT_REQUEST : request;
 
         if (requestFinal == DEFAULT_REQUEST) {
-            managerOfThreads.safeAccept(callback, new ModelGetPreviewResponse(null));
+            managerOfThreads.safeAccept(callback, new ModelGetPreviewResponse(null, null));
             return;
         }
 
@@ -392,8 +394,21 @@ public class ManagerOfFiles implements IManagerOfFiles {
             }
         };
 
+        Function1<ModelMediaFile, Drawable> getAnimatedPreview = _item -> {
+            try {
+                ImageDecoder.Source source = ImageDecoder.createSource(new File(_item.path));
+                return ImageDecoder.decodeDrawable(source, (decoder, info, src) -> {
+                    decoder.setTargetSize(targetPreviewResolutionFinal.getWidth(), targetPreviewResolutionFinal.getHeight());
+                });
+            } catch (Exception e) {
+                Log.e(LOG_TAG, e.getMessage());
+                return null;
+            }
+        };
+
         Runnable loadPreview = () -> {
             Bitmap bitmap = null;
+            Drawable drawable = null;
 
             try {
                 if (requestFinal.file.isImage) {
@@ -402,12 +417,16 @@ public class ManagerOfFiles implements IManagerOfFiles {
                 if (requestFinal.file.isVideo) {
                     bitmap = getVideoPreview.invoke(requestFinal.file);
                 }
+                if (requestFinal.file.isAnimatedImage) {
+                    drawable = getAnimatedPreview.invoke(requestFinal.file);
+                }
             } catch (Exception e) {
                 Log.e(LOG_TAG + 4.1, e.getMessage());
             }
 
             ModelGetPreviewResponse response = new ModelGetPreviewResponse(
-                    bitmap
+                    bitmap,
+                    drawable
             );
 
             managerOfThreads.safeAccept(callback, response);
