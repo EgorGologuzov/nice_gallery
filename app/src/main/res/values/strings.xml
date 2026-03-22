@@ -30,6 +30,22 @@
     <!--Rewind time-->
     <string name="format_rewind_time_forward">+%d</string>
     <string name="format_rewind_time_back">-%d</string>
+    <!--Messages-->
+    <string name="format_message_action">Действие: %s</string>
+    <string name="format_message_path">Путь: %s</string>
+    <string name="format_message_elements">Элементы (%d):</string>
+    <string name="format_message_success_handled_files">Успешно обработаны (%d):</string>
+    <string name="format_message_skipped_files">Пропущены (%d):</string>
+    <string name="format_message_renamed_files">Переименованы (%d):</string>
+    <string name="format_message_replaced_files">Заменены (%d):</string>
+    <string name="format_message_failed_files">Ошибки (%d):</string>
+    <string name="format_message_file_fail_item">%s - %s;</string>
+    <string name="format_message_global_error">Ошибка: %s</string>
+    <string name="format_message_duplicate_name_policy">Если имя файла занято: %s</string>
+    <string name="format_message_file_type_folder">[Папка] %s;</string>
+    <string name="format_message_file_type_file">[Файл] %s;</string>
+    <string name="format_message_file_type_other">[] %s;</string>
+    <string name="format_status_info_action_progress">Обработка: %s (%d/%d)</string>
 
 <!--Symbols-->
     <string name="symbol_dot_separator">" • "</string>
@@ -57,6 +73,7 @@
     <string name="toast_invalid_path_value">Некорректный путь</string>
     <string name="toast_path_successfully_added">Путь успешно добавлен</string>
     <string name="toast_path_already_added">Путь уже добавлен</string>
+    <string name="toast_select_files">Выберите хотя бы 1 файл</string>
 
 <!--Dialogs-->
     <string name="dialog_title_permission_required">Необходимо разрешение</string>
@@ -67,6 +84,11 @@
     <string name="dialog_title_file_properties">Свойства файла</string>
     <string name="dialog_title_prompt_input_path">Введите путь</string>
     <string name="dialog_title_scan_mode">Режим сканирования</string>
+    <string name="dialog_title_choice_action">Выберите действие</string>
+    <string name="dialog_title_perform_an_action">Выполнить действие?</string>
+    <string name="dialog_title_choice_path">Выберите путь</string>
+    <string name="dialog_title_action_report">Отчет о действии</string>
+    <string name="dialog_title_duplicate_name_policy">Если имя файла занято?</string>
     <string name="dialog_button_ok">ОК</string>
     <string name="dialog_button_yes">Да</string>
     <string name="dialog_button_no">Нет</string>
@@ -103,6 +125,17 @@
         <item>Только папки из списка</item>
         <item>Только папки НЕ из списка</item>
         <item>Игнорировать хранилище</item>
+    </string-array>
+    <string-array name="enum_files_actions">
+        <item>Переместить</item>
+        <item>Копировать</item>
+        <item>Удалить</item>
+        <item>Создать папку</item>
+    </string-array>
+    <string-array name="enum_duplicate_name_policy">
+        <item>Пропустить</item>
+        <item>Заменить</item>
+        <item>Переименовать</item>
     </string-array>
 
 </resources>

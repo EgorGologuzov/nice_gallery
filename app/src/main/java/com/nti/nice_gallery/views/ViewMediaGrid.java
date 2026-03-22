@@ -2,7 +2,6 @@ package com.nti.nice_gallery.views;
 
 import android.content.Context;
 import android.util.AttributeSet;
-import android.util.Log;
 import android.util.Size;
 import android.view.View;
 import android.view.ViewGroup;
@@ -16,6 +15,7 @@ import com.nti.nice_gallery.R;
 import com.nti.nice_gallery.data.Domain;
 import com.nti.nice_gallery.data.IManagerOfSettings;
 import com.nti.nice_gallery.models.ModelMediaFile;
+import com.nti.nice_gallery.utils.GestureListener;
 import com.nti.nice_gallery.utils.ManagerOfThreads;
 import com.nti.nice_gallery.utils.ReadOnlyList;
 import com.nti.nice_gallery.utils.Convert;
@@ -25,6 +25,7 @@ import com.nti.nice_gallery.views.grid_items.GridItemQuilt;
 import com.nti.nice_gallery.views.grid_items.GridItemSquare;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -35,18 +36,22 @@ public class ViewMediaGrid extends ScrollView {
     private static final String LOG_TAG = "ViewMediaGrid";
 
     public enum GridVariant { List, ThreeColumns, SixColumns, Quilt }
-    public enum State { ScanningInProgress, FilesLoading, StandbyMode }
+    public enum CurrentWork { ScanningInProgress, FilesLoading, Standby }
+
+    private boolean isSelectedMode = false;
+    private HashMap<String, ModelMediaFile> selectedFiles;
 
     private LinearLayout container;
     private ViewInfo viewInfoScanningInProgress;
     private ViewInfo viewInfoFilesLoading;
     private ViewInfo viewInfoNoItems;
 
-    private ReadOnlyList<ModelMediaFile> items;
+    private ReadOnlyList<ModelMediaFile> mediaFiles;
     private GridVariant gridVariant;
     private int renderedItemsCount = 0;
-    private State state = State.StandbyMode;
+    private CurrentWork currentWork = CurrentWork.Standby;
     private Consumer<ViewMediaGrid> stateChangeListener;
+    private Consumer<ViewMediaGrid> selectedModeChangeListener;
     private Consumer<GridItemBase> itemClickListener;
 
     private IManagerOfSettings managerOfSettings;
@@ -103,12 +108,12 @@ public class ViewMediaGrid extends ScrollView {
         updateGrid();
     }
 
-    public ReadOnlyList<ModelMediaFile> getItems() {
-        return items;
+    public ReadOnlyList<ModelMediaFile> getMediaFiles() {
+        return mediaFiles;
     }
 
-    public void setItems(ReadOnlyList<ModelMediaFile> items) {
-        this.items = items;
+    public void setMediaFiles(ReadOnlyList<ModelMediaFile> mediaFiles) {
+        this.mediaFiles = mediaFiles;
         updateGrid();
     }
 
@@ -121,30 +126,30 @@ public class ViewMediaGrid extends ScrollView {
         updateGrid();
     }
 
-    public State getState() {
-        return state;
+    public CurrentWork getState() {
+        return currentWork;
     }
 
-    private void setState(State state) {
-        this.state = state;
+    private void setCurrentWork(CurrentWork currentWork) {
+        this.currentWork = currentWork;
         if (stateChangeListener != null) {
             stateChangeListener.accept(this);
         }
     }
 
     public boolean trySetStateScanningInProgress(boolean isScanningInProgress) {
-        if (state == State.FilesLoading) {
+        if (currentWork == CurrentWork.FilesLoading) {
             return false;
         }
 
         if (isScanningInProgress) {
-            if (state != State.ScanningInProgress) {
-                setState(State.ScanningInProgress);
+            if (currentWork != CurrentWork.ScanningInProgress) {
+                setCurrentWork(CurrentWork.ScanningInProgress);
                 updateGrid();
             }
         } else {
-            if (state != State.StandbyMode) {
-                setState(State.StandbyMode);
+            if (currentWork != CurrentWork.Standby) {
+                setCurrentWork(CurrentWork.Standby);
                 updateGrid();
             }
         }
@@ -156,18 +161,57 @@ public class ViewMediaGrid extends ScrollView {
         stateChangeListener = listener;
     }
 
+    public void setSelectedModeChangeListener(Consumer<ViewMediaGrid> listener) {
+        this.selectedModeChangeListener = listener;
+    }
+
     public void setItemClickListener(Consumer<GridItemBase> listener) {
         itemClickListener = listener;
     }
 
+    public boolean getSelectedMode() {
+        return isSelectedMode;
+    }
+
+    public void setSelectedMode(boolean isSelectedMode) {
+        if (this.isSelectedMode == isSelectedMode) {
+            return;
+        }
+
+        if (!isSelectedMode && selectedFiles != null) {
+            selectedFiles.clear();
+        }
+
+        this.isSelectedMode = isSelectedMode;
+        recursivelyHandleAllGridItems(container, item -> {
+            item.setCheckBoxVisibility(isSelectedMode);
+            item.setIsSelected(selectedFiles != null && selectedFiles.containsKey(item.getModel().path));
+        });
+
+        if (selectedModeChangeListener != null) {
+            selectedModeChangeListener.accept(this);
+        }
+    }
+
+    public HashMap<String, ModelMediaFile> getSelectedFiles() {
+        return selectedFiles;
+    }
+
+    public void setSelectedFiles(HashMap<String, ModelMediaFile> selectedFiles) {
+        this.selectedFiles = selectedFiles;
+        recursivelyHandleAllGridItems(container, item -> {
+            item.setIsSelected(selectedFiles.containsKey(item.getModel().path));
+        });
+    }
+
     private void updateGrid() {
-        if (state == State.ScanningInProgress) {
+        if (currentWork == CurrentWork.ScanningInProgress) {
             container.removeAllViews();
             container.addView(viewInfoScanningInProgress);
             return;
         }
 
-        if (items == null || items.isEmpty()) {
+        if (mediaFiles == null || mediaFiles.isEmpty()) {
             container.removeAllViews();
             container.addView(viewInfoNoItems);
             return;
@@ -192,28 +236,28 @@ public class ViewMediaGrid extends ScrollView {
     private void renderNextItems() {
         final int RENDERING_STEP_ITEMS_COUNT = 25;
 
-        if (this.state == State.FilesLoading
-                || this.state == State.ScanningInProgress
-                || this.items == null
-                || this.items.isEmpty()
-                || this.renderedItemsCount == this.items.size()
+        if (this.currentWork == CurrentWork.FilesLoading
+                || this.currentWork == CurrentWork.ScanningInProgress
+                || this.mediaFiles == null
+                || this.mediaFiles.isEmpty()
+                || this.renderedItemsCount == this.mediaFiles.size()
         ) {
             return;
         }
 
-        setState(State.FilesLoading);
+        setCurrentWork(CurrentWork.FilesLoading);
         container.addView(viewInfoFilesLoading);
 
         Supplier<LinearLayout> renderNextForListVariant = () -> {
             int from = renderedItemsCount;
-            int to = Math.min(renderedItemsCount + RENDERING_STEP_ITEMS_COUNT, items.size());
+            int to = Math.min(renderedItemsCount + RENDERING_STEP_ITEMS_COUNT, mediaFiles.size());
 
             LinearLayout pageContainer = new LinearLayout(getContext());
             pageContainer.setLayoutParams(new LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
             pageContainer.setOrientation(LinearLayout.VERTICAL);
 
             for (int i = from; i < to; i++) {
-                ModelMediaFile item = items.get(i);
+                ModelMediaFile item = mediaFiles.get(i);
                 GridItemLine itemView = new GridItemLine(getContext());
                 itemView.setModel(item);
                 pageContainer.addView(itemView);
@@ -228,7 +272,7 @@ public class ViewMediaGrid extends ScrollView {
             final int HIDE_ITEM_DATA_IF_COLUMNS_COUNT_MORE_THAN = 3;
 
             int from = renderedItemsCount;
-            int to = Math.min(renderedItemsCount + RENDERING_STEP_ITEMS_COUNT, items.size());
+            int to = Math.min(renderedItemsCount + RENDERING_STEP_ITEMS_COUNT, mediaFiles.size());
 
             LinearLayout pageContainer = new LinearLayout(getContext());
             pageContainer.setLayoutParams(new LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
@@ -237,14 +281,14 @@ public class ViewMediaGrid extends ScrollView {
             int itemsCount = 0;
             LinearLayout row = null;
 
-            for (int i = from; i < to || (row != null && i < items.size()); i++) {
+            for (int i = from; i < to || (row != null && i < mediaFiles.size()); i++) {
                 if (row == null) {
                     row = new LinearLayout(getContext());
                     row.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
                     row.setOrientation(LinearLayout.HORIZONTAL);
                 }
 
-                ModelMediaFile item = items.get(i);
+                ModelMediaFile item = mediaFiles.get(i);
                 GridItemSquare itemView = new GridItemSquare(getContext());
                 itemView.setIsInfoHidden(columnsCount > HIDE_ITEM_DATA_IF_COLUMNS_COUNT_MORE_THAN);
                 itemView.setModel(item);
@@ -272,9 +316,10 @@ public class ViewMediaGrid extends ScrollView {
             final int CONTAINER_HORIZONTAL_PADDING_DP = 4;
             final int ITEM_MARGIN_DP = 4;
             final float MIN_ROW_WIDTH_TO_HEIGHT_RATIO = 1.5f;
+            final int MAX_ITEMS_IN_ROW = 3;
 
             int from = renderedItemsCount;
-            int to = Math.min(renderedItemsCount + RENDERING_STEP_ITEMS_COUNT, items.size());
+            int to = Math.min(renderedItemsCount + RENDERING_STEP_ITEMS_COUNT, mediaFiles.size());
 
             LinearLayout pageContainer = new LinearLayout(getContext());
             pageContainer.setLayoutParams(new LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
@@ -288,7 +333,7 @@ public class ViewMediaGrid extends ScrollView {
             ArrayList<Float> rowHeights = null;
             int itemsCount = 0;
 
-            for (int j = from; j < to || (rowLayout != null && j < items.size()); j++) {
+            for (int j = from; j < to || (rowLayout != null && j < mediaFiles.size()); j++) {
                 if (rowLayout == null) {
                     rowLayout = new LinearLayout(getContext());
                     rowLayout.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
@@ -298,7 +343,7 @@ public class ViewMediaGrid extends ScrollView {
                     rowHeights = new ArrayList<>();
                 }
 
-                ModelMediaFile item = items.get(j);
+                ModelMediaFile item = mediaFiles.get(j);
 
                 rowItems.add(item);
                 itemsCount++;
@@ -319,9 +364,12 @@ public class ViewMediaGrid extends ScrollView {
                 float sumWidth = rowWidths.stream().reduce(0f, Float::sum);
                 float maxHeight = rowHeights.stream().max(Float::compareTo).get();
                 float avgHeight = rowHeights.stream().reduce(0f, Float::sum) / rowHeights.size();
-                boolean isItemLast = items.indexOf(item) == items.size() - 1;
+                boolean isItemLast = mediaFiles.indexOf(item) == mediaFiles.size() - 1;
 
-                if ((sumWidth < MIN_IMAGES_ROW_WIDTH_PX || sumWidth / avgHeight < MIN_ROW_WIDTH_TO_HEIGHT_RATIO) && !isItemLast) {
+                if ((sumWidth < MIN_IMAGES_ROW_WIDTH_PX || sumWidth / avgHeight < MIN_ROW_WIDTH_TO_HEIGHT_RATIO)
+                        && rowWidths.size() < MAX_ITEMS_IN_ROW
+                        && !isItemLast
+                ) {
                     continue;
                 }
 
@@ -378,6 +426,82 @@ public class ViewMediaGrid extends ScrollView {
             });
         };
 
+        Consumer<GridItemBase.TouchArgs> onItemGestureDetected = new Consumer<GridItemBase.TouchArgs>() {
+            ModelMediaFile previousChangedFile;
+            @Override
+            public void accept(GridItemBase.TouchArgs touchArgs) {
+                GridItemBase gridItem = touchArgs.item;
+
+                if (!isSelectedMode) {
+                    if (touchArgs.gestureArgs.gesture == GestureListener.Gesture.Tap) {
+                        managerOfThreads.safeAccept(itemClickListener, gridItem);
+                    }
+                    if (touchArgs.gestureArgs.gesture == GestureListener.Gesture.LongPress) {
+                        setSelectedMode(true);
+                        changeItemSelectState(gridItem);
+                    }
+                } else {
+                    if (touchArgs.gestureArgs.gesture == GestureListener.Gesture.Tap) {
+                        changeItemSelectState(gridItem);
+                    }
+                    if (touchArgs.gestureArgs.gesture == GestureListener.Gesture.LongPress) {
+                        setSelectedMode(false);
+                    }
+                    if (touchArgs.gestureArgs.gesture == GestureListener.Gesture.DoubleTap) {
+                        changeItemSelectStateWithShift(gridItem);
+                    }
+                }
+            }
+
+            private void changeItemSelectState(GridItemBase gridItem) {
+                ModelMediaFile file = gridItem.getModel();
+
+                if (selectedFiles.containsKey(file.path)) {
+                    selectedFiles.remove(file.path);
+                    gridItem.setIsSelected(false);
+                } else {
+                    selectedFiles.put(file.path, file);
+                    gridItem.setIsSelected(true);
+                }
+
+                previousChangedFile = file;
+            }
+
+            private void changeItemSelectStateWithShift(GridItemBase gridItem) {
+                ModelMediaFile file = gridItem.getModel();
+
+                if (previousChangedFile != null) {
+                    int previousTouchedIndex = mediaFiles.indexOf(previousChangedFile);
+                    int nowTouchedIndex = mediaFiles.indexOf(file);
+                    boolean isPreviousTouchedSelected = selectedFiles.containsKey(previousChangedFile.path);
+                    int step = previousTouchedIndex <= nowTouchedIndex ? 1 : -1;
+
+                    for (int i = previousTouchedIndex; i - nowTouchedIndex != step; i += step) {
+                        ModelMediaFile iFile = mediaFiles.get(i);
+                        if (isPreviousTouchedSelected) {
+                            selectedFiles.put(iFile.path, iFile);
+                        } else {
+                            selectedFiles.remove(iFile.path);
+                        }
+                    }
+
+                    recursivelyHandleAllGridItems(container, item -> {
+                        item.setIsSelected(selectedFiles.containsKey(item.getModel().path));
+                    });
+                } else {
+                    changeItemSelectState(gridItem);
+                }
+
+                previousChangedFile = file;
+            }
+        };
+
+        Consumer<GridItemBase> itemPostRenderHandler = item -> {
+            item.setOnTouchListener(onItemGestureDetected);
+            item.setCheckBoxVisibility(isSelectedMode);
+            item.setIsSelected(selectedFiles != null && selectedFiles.containsKey(item.getModel().path));
+        };
+
         Runnable renderOnePage = () -> {
             managerOfThreads.executeAsync(() -> {
                 LinearLayout pageContainer = null;
@@ -389,14 +513,13 @@ public class ViewMediaGrid extends ScrollView {
                     case Quilt: pageContainer = renderNextForQuiltVariant.get(); break;
                 }
 
-                setupGridItemsClickListener(pageContainer, item -> managerOfThreads.safeAccept(itemClickListener, item));
-
                 final LinearLayout pageContainerFinal = pageContainer;
 
                 managerOfThreads.runOnUiThread(() -> {
+                    recursivelyHandleAllGridItems(pageContainerFinal, itemPostRenderHandler);
                     container.removeView(viewInfoFilesLoading);
                     container.addView(pageContainerFinal);
-                    setState(State.StandbyMode);
+                    setCurrentWork(CurrentWork.Standby);
                     checkIsContainerFullAndLoadNextIfNot.run();
                 });
             });
@@ -405,8 +528,8 @@ public class ViewMediaGrid extends ScrollView {
         renderOnePage.run();
     }
 
-    private void setupGridItemsClickListener(ViewGroup root, Consumer<GridItemBase> listener) {
-        if (root == null) return;
+    private void recursivelyHandleAllGridItems(ViewGroup root, Consumer<GridItemBase> handler) {
+        if (root == null || handler == null) return;
 
         int childCount = root.getChildCount();
 
@@ -415,11 +538,11 @@ public class ViewMediaGrid extends ScrollView {
 
             if (child instanceof GridItemBase) {
                 GridItemBase item = (GridItemBase) child;
-                item.setOnClickListener(listener);
+                handler.accept(item);
             }
 
             if (child instanceof ViewGroup) {
-                setupGridItemsClickListener((ViewGroup) child, listener);
+                recursivelyHandleAllGridItems((ViewGroup) child, handler);
             }
         }
     }

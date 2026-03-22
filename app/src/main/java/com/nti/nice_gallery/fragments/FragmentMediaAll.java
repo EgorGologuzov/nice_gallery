@@ -7,6 +7,8 @@ import androidx.fragment.app.Fragment;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.TextView;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
@@ -15,11 +17,11 @@ import com.nti.nice_gallery.activities.ActivityMediaView;
 import com.nti.nice_gallery.data.Domain;
 import com.nti.nice_gallery.data.IManagerOfFiles;
 import com.nti.nice_gallery.data.IManagerOfSettings;
-import com.nti.nice_gallery.data.ManagerOfSettings;
 import com.nti.nice_gallery.models.ModelFilters;
 import com.nti.nice_gallery.models.ModelGetFilesRequest;
 import com.nti.nice_gallery.models.ModelGetFilesResponse;
 import com.nti.nice_gallery.models.ModelMediaFile;
+import com.nti.nice_gallery.models.ModelRequestProgress;
 import com.nti.nice_gallery.models.ModelScanParams;
 import com.nti.nice_gallery.utils.ManagerOfDialogs;
 import com.nti.nice_gallery.utils.ManagerOfNavigation;
@@ -27,20 +29,32 @@ import com.nti.nice_gallery.utils.ManagerOfThreads;
 import com.nti.nice_gallery.utils.ReadOnlyList;
 import com.nti.nice_gallery.views.ViewActionBar;
 import com.nti.nice_gallery.views.ViewMediaGrid;
+import com.nti.nice_gallery.views.buttons.ButtonCancel;
 import com.nti.nice_gallery.views.buttons.ButtonChoiceFilters;
 import com.nti.nice_gallery.views.buttons.ButtonChoiceGridVariant;
 import com.nti.nice_gallery.views.buttons.ButtonChoiceSortVariant;
+import com.nti.nice_gallery.views.buttons.ButtonCopyFiles;
+import com.nti.nice_gallery.views.buttons.ButtonDeleteFiles;
 import com.nti.nice_gallery.views.buttons.ButtonRefresh;
+import com.nti.nice_gallery.views.buttons.ButtonReplaceFiles;
 import com.nti.nice_gallery.views.buttons.ButtonScanningReport;
+import com.nti.nice_gallery.views.buttons.ButtonSelectAll;
 import com.nti.nice_gallery.views.grid_items.GridItemBase;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 public class FragmentMediaAll extends Fragment {
+
+    private static final String LOG_TAG = "FragmentMediaAll";
+
+    private static boolean isSelectedMode = false;
+    private static HashMap<String, ModelMediaFile> selectedFiles;
+    private static boolean isBusy = false;
 
     private ModelGetFilesRequest request;
     private ModelGetFilesResponse response;
@@ -56,12 +70,22 @@ public class FragmentMediaAll extends Fragment {
         ButtonChoiceFilters buttonFilters = view.findViewById(R.id.buttonFilters);
         ButtonRefresh buttonRefresh = view.findViewById(R.id.buttonRefresh);
         ButtonScanningReport buttonScanningReport = view.findViewById(R.id.buttonScanningReport);
+        ButtonSelectAll buttonSelectAll = view.findViewById(R.id.buttonSelectAll);
+        ButtonReplaceFiles buttonReplaceFiles = view.findViewById(R.id.buttonReplaceFiles);
+        ButtonCopyFiles buttonCopyFiles = view.findViewById(R.id.buttonCopyFiles);
+        ButtonDeleteFiles buttonDeleteFiles = view.findViewById(R.id.buttonDeleteFiles);
+        ButtonCancel buttonCancel = view.findViewById(R.id.buttonCancel);
+        TextView textStatusInfo = view.findViewById(R.id.textStatusInfo);
 
         IManagerOfFiles managerOfFiles = Domain.getManagerOfFiles(getContext());
         ManagerOfThreads managerOfThreads = new ManagerOfThreads(getContext());
         ManagerOfDialogs managerOfDialogs = new ManagerOfDialogs(getContext());
         ManagerOfNavigation managerOfNavigation = new ManagerOfNavigation(getContext());
         IManagerOfSettings managerOfSettings = Domain.getManagerOfSettings(getContext());
+
+        if (selectedFiles == null) {
+            selectedFiles = new HashMap<>();
+        }
 
         Supplier<ModelGetFilesRequest> buildRequest = () -> {
             ModelGetFilesRequest.SortVariant sortVariant = ModelGetFilesRequest.SortVariant.ByCreateAtDesc;
@@ -107,9 +131,10 @@ public class FragmentMediaAll extends Fragment {
                 managerOfThreads.runOnUiThread(() -> {
                     FragmentMediaAll.this.response = response;
                     if (response.error == null) {
-                        viewMediaGrid.setItems(response.files);
+                        viewMediaGrid.setMediaFiles(response.files);
                         viewMediaGrid.trySetStateScanningInProgress(false);
                         buttonScanningReport.setSource(response);
+                        buttonSelectAll.setAllFiles(response.files);
                     } else {
                         viewMediaGrid.trySetStateScanningInProgress(false);
                         managerOfDialogs.showInfo(R.string.dialog_title_something_wrong, R.string.message_error_scanning_failed);
@@ -131,8 +156,23 @@ public class FragmentMediaAll extends Fragment {
             }
         };
 
+        Runnable onIsBusyChanged = () -> {
+            if (isBusy) {
+                viewActionBar.setIsEnabled(false);
+                textStatusInfo.setVisibility(View.VISIBLE);
+            } else {
+                viewActionBar.setIsEnabled(true);
+                textStatusInfo.setVisibility(View.GONE);
+            }
+        };
+
         Consumer<ViewMediaGrid> onViewMediaGridStateChangeListener = v -> {
-            viewActionBar.setIsEnabled(v.getState() == ViewMediaGrid.State.StandbyMode);
+            boolean currentIsBusy = isBusy;
+            isBusy = v.getState() != ViewMediaGrid.CurrentWork.Standby;
+            if (currentIsBusy != isBusy) {
+                textStatusInfo.setText(R.string.message_loading_in_progress);
+                onIsBusyChanged.run();
+            }
         };
 
         Consumer<ButtonChoiceGridVariant> onGridVariantChange = btn -> {
@@ -144,12 +184,83 @@ public class FragmentMediaAll extends Fragment {
             refreshFilesList.run();
         };
 
+        Runnable onSelectedModeChange = () -> {
+            int commonButtonsVisibility = isSelectedMode ? View.GONE : View.VISIBLE;
+            int selectedModeButtonsVisibility = isSelectedMode ? View.VISIBLE : View.GONE;
+
+            buttonGridVariant.setVisibility(commonButtonsVisibility);
+            buttonSortVariant.setVisibility(commonButtonsVisibility);
+            buttonFilters.setVisibility(commonButtonsVisibility);
+            buttonRefresh.setVisibility(commonButtonsVisibility);
+            buttonScanningReport.setVisibility(commonButtonsVisibility);
+
+            buttonSelectAll.setVisibility(selectedModeButtonsVisibility);
+            buttonReplaceFiles.setVisibility(selectedModeButtonsVisibility);
+            buttonCopyFiles.setVisibility(selectedModeButtonsVisibility);
+            buttonDeleteFiles.setVisibility(selectedModeButtonsVisibility);
+            buttonCancel.setVisibility(selectedModeButtonsVisibility);
+        };
+
+        Consumer<ViewMediaGrid> onGridSelectedModeChanged = v -> {
+            isSelectedMode = v.getSelectedMode();
+            selectedFiles = v.getSelectedFiles();
+            onSelectedModeChange.run();
+        };
+
+        Runnable cancelSelectedMode = () -> {
+            isSelectedMode = false;
+            onSelectedModeChange.run();
+            viewMediaGrid.setSelectedMode(isSelectedMode);
+            buttonSelectAll.setChecked(false);
+        };
+
+        Runnable onSelectedFilesChanged = () -> {
+            viewMediaGrid.setSelectedFiles(selectedFiles);
+        };
+
+        Consumer onActionFinished = __ -> {
+            managerOfThreads.runOnUiThread(() -> {
+                cancelSelectedMode.run();
+                refreshFilesList.run();
+                isBusy = false;
+                onIsBusyChanged.run();
+            });
+        };
+
+        Consumer<ModelRequestProgress> onActionProgress = progress -> {
+            managerOfThreads.runOnUiThread(() -> {
+                textStatusInfo.setText(getString(R.string.format_status_info_action_progress, progress.currentStep, progress.numberCompletedSteps, progress.numberTotalSteps));
+                if (!isBusy) {
+                    isBusy = true;
+                    onIsBusyChanged.run();
+                }
+            });
+        };
+
         viewMediaGrid.setStateChangeListener(onViewMediaGridStateChangeListener);
         viewMediaGrid.setItemClickListener(onGridItemClick);
+        viewMediaGrid.setSelectedModeChangeListener(onGridSelectedModeChanged);
 
         buttonGridVariant.setVariantChangeListener(onGridVariantChange);
         buttonSortVariant.setVariantChangeListener(onSortVariantChange);
         buttonRefresh.setRefreshListener(refreshFilesList);
+
+        buttonSelectAll.setSelectedFilesChangedListener(btn -> onSelectedFilesChanged.run());
+        buttonReplaceFiles.setActionFinishedListener(onActionFinished);
+        buttonReplaceFiles.setActionProgressListener(btn -> onActionProgress.accept(btn.getProgress()));
+        buttonCopyFiles.setActionFinishedListener(onActionFinished);
+        buttonCopyFiles.setActionProgressListener(btn -> onActionProgress.accept(btn.getProgress()));
+        buttonDeleteFiles.setActionFinishedListener(onActionFinished);
+        buttonDeleteFiles.setActionProgressListener(btn -> onActionProgress.accept(btn.getProgress()));
+        buttonCancel.setOnClickListener(btn -> cancelSelectedMode.run());
+
+        buttonSelectAll.setSelectedFiles(selectedFiles);
+        buttonReplaceFiles.setFiles(selectedFiles);
+        buttonCopyFiles.setFiles(selectedFiles);
+        buttonDeleteFiles.setFiles(selectedFiles);
+
+        viewMediaGrid.setSelectedFiles(selectedFiles);
+        viewMediaGrid.setSelectedMode(isSelectedMode);
 
         refreshFilesList.run();
 

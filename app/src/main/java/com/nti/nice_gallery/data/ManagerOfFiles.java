@@ -16,6 +16,8 @@ import android.util.Size;
 
 import com.nti.nice_gallery.R;
 import com.nti.nice_gallery.models.ModelFileFormat;
+import com.nti.nice_gallery.models.ModelFilesActionRequest;
+import com.nti.nice_gallery.models.ModelFilesActionResponse;
 import com.nti.nice_gallery.models.ModelFilters;
 import com.nti.nice_gallery.models.ModelGetFilesRequest;
 import com.nti.nice_gallery.models.ModelGetFilesResponse;
@@ -24,6 +26,7 @@ import com.nti.nice_gallery.models.ModelGetPreviewResponse;
 import com.nti.nice_gallery.models.ModelGetStoragesRequest;
 import com.nti.nice_gallery.models.ModelGetStoragesResponse;
 import com.nti.nice_gallery.models.ModelMediaFile;
+import com.nti.nice_gallery.models.ModelRequestProgress;
 import com.nti.nice_gallery.models.ModelScanParams;
 import com.nti.nice_gallery.models.ModelStorage;
 import com.nti.nice_gallery.utils.ManagerOfThreads;
@@ -31,6 +34,8 @@ import com.nti.nice_gallery.utils.ReadOnlyList;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.attribute.BasicFileAttributes;
@@ -39,10 +44,16 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 import kotlin.jvm.functions.Function1;
 import kotlin.jvm.functions.Function2;
@@ -433,6 +444,369 @@ public class ManagerOfFiles implements IManagerOfFiles {
         };
 
         managerOfThreads.executeAsync(loadPreview);
+    }
+
+    @Override
+    public void executeAction(ModelFilesActionRequest request, Consumer<ModelFilesActionResponse> callbackResult, Consumer<ModelRequestProgress> callbackProgress) {
+        List<ModelFilesActionResponse.FileInfo> actionFiles = new ArrayList<>();
+        List<ModelFilesActionResponse.FileInfo> success = new ArrayList<>();
+        List<ModelFilesActionResponse.FileInfo> skipped = new ArrayList<>();
+        List<ModelFilesActionResponse.FileInfo> renamed = new ArrayList<>();
+        List<ModelFilesActionResponse.FileInfo> replaced = new ArrayList<>();
+        List<ModelFilesActionResponse.Fail> fails = new ArrayList<>();
+
+        Supplier<Exception> createFolderIfNotExists = () -> {
+            File targetDir = request.targetPath != null ? new File(request.targetPath) : null;
+
+            if (targetDir == null) {
+                return new Exception("Path parameter is required for this action");
+            }
+
+            boolean targetDirExists = targetDir.exists();
+            boolean targetDirIsDirectory = targetDir.isDirectory();
+            if (targetDirExists && !targetDirIsDirectory) {
+                return new Exception("Path parameter is existing file, not folder");
+            }
+            if (!targetDirExists) {
+                if (!targetDir.mkdirs()) {
+                    return new Exception("Failed to create folder with same name. Check name correctness for target file system.");
+                }
+            }
+
+            return null;
+        };
+
+        Runnable collectChildrenForRequestFiles = () -> {
+            if (request.files != null && !request.files.isEmpty()) {
+                for (ModelMediaFile file : request.files) {
+                    if (file.isFolder) {
+                        File folder = new File(file.path);
+                        collectChildrenFilesInfo(folder, actionFiles);
+                    }
+                    if (file.isFile) {
+                        actionFiles.add(new ModelFilesActionResponse.FileInfo(file.name, file.path, false));
+                    }
+                    if (file.isStorage) {
+                        skipped.add(new ModelFilesActionResponse.FileInfo(file.name, file.path, true));
+                    }
+                }
+            }
+        };
+
+        Function1<File, File> createUniqueFile = dest -> {
+            if (!dest.exists()) return dest;
+
+            File parent = dest.getParentFile();
+            String name = dest.getName();
+            String baseName = name;
+            String extension = "";
+
+            int dotIndex = name.lastIndexOf('.');
+            if (dotIndex > 0) {
+                baseName = name.substring(0, dotIndex);
+                extension = name.substring(dotIndex);
+            }
+
+            int count = 1;
+            while (dest.exists()) {
+                dest = new File(parent, baseName + " (" + count + ")" + extension);
+                count++;
+            }
+
+            return dest;
+        };
+
+        Function1<List<String>, String> findCommonPath = paths -> {
+            if (paths == null || paths.isEmpty()) return "";
+            if (paths.size() == 1) return paths.get(0);
+
+            Collections.sort(paths);
+
+            String first = paths.get(0);
+            String last = paths.get(paths.size() - 1);
+
+            int i = 0;
+            while (i < first.length() && i < last.length() && first.charAt(i) == last.charAt(i)) {
+                i++;
+            }
+
+            String commonPrefix = first.substring(0, i);
+            int lastSlash = commonPrefix.lastIndexOf('/');
+
+            return lastSlash == -1 ? "" : commonPrefix.substring(0, lastSlash + 1);
+        };
+
+        Runnable deleteAction = () -> {
+            int totalFiles = actionFiles.size();
+            actionFiles.sort((f1, f2) -> Integer.compare(f2.path.length(), f1.path.length()));
+
+            for (int i = 0; i < totalFiles; i++) {
+                ModelFilesActionResponse.FileInfo fileInfo = actionFiles.get(i);
+                File source = new File(fileInfo.path);
+
+                managerOfThreads.safeAccept(callbackProgress, new ModelRequestProgress(i + 1, totalFiles, fileInfo.name));
+
+                if (source.delete()) {
+                    success.add(fileInfo);
+                } else {
+                    fails.add(new ModelFilesActionResponse.Fail(fileInfo, new Exception("Fail delete file")));
+                }
+            }
+        };
+
+        Runnable replaceAction = () -> {
+            int totalFiles = actionFiles.size();
+            actionFiles.sort(Comparator.comparingInt(f -> f.path.length()));
+
+            List<String> allPaths = actionFiles.stream().map(fileInfo -> fileInfo.path).collect(Collectors.toList());
+            String commonPath = findCommonPath.invoke(allPaths);
+
+            HashMap<ModelFilesActionResponse.FileInfo, String> newFilePaths = new HashMap<>();
+            boolean hasFoldersInActionFiles = actionFiles.stream().map(f -> f.isFolder ? 1 : 0).reduce(0, Integer::sum) != 0;
+            for (ModelFilesActionResponse.FileInfo fileInfo : actionFiles) {
+                String newFilePath = totalFiles > 1 && hasFoldersInActionFiles
+                        ? (request.targetPath + "/" + fileInfo.path.substring(commonPath.length())).replace("//", "/")
+                        : (request.targetPath + "/" + fileInfo.name).replace("//", "/");
+                newFilePaths.put(fileInfo, newFilePath);
+            }
+
+            for (int i = 0; i < totalFiles; i++) {
+                ModelFilesActionResponse.FileInfo fileInfo = actionFiles.get(i);
+                File source = new File(fileInfo.path);
+                File dest = new File(newFilePaths.get(fileInfo));
+                boolean destExists = dest.exists();
+
+                managerOfThreads.safeAccept(callbackProgress, new ModelRequestProgress(i + 1, totalFiles, fileInfo.name));
+
+                if (destExists && request.duplicateNamePolicy == ModelFilesActionRequest.DuplicateNamePolicy.Skip
+                        || Objects.equals(source.getAbsolutePath(), dest.getAbsolutePath())
+                ) {
+                    skipped.add(fileInfo);
+                    continue;
+                }
+
+                if (destExists && request.duplicateNamePolicy == ModelFilesActionRequest.DuplicateNamePolicy.Rename) {
+                    String oldPath = dest.getAbsolutePath();
+                    dest = createUniqueFile.invoke(dest);
+                    String newPath = dest.getAbsolutePath();
+                    if (fileInfo.isFolder) {
+                        for (ModelFilesActionResponse.FileInfo fi : actionFiles) {
+                            String newFilePath = newFilePaths.get(fi);
+                            if (newFilePath.startsWith(oldPath)) {
+                                newFilePaths.put(fi, newPath + "/" + newFilePath.substring(oldPath.length()).replace("//", "/"));
+                            }
+                        }
+                    }
+                }
+
+                if (source.isDirectory()) {
+                    if (dest.exists()) {
+                        List<ModelFilesActionResponse.FileInfo> children = new ArrayList<>();
+                        collectChildrenFilesInfo(dest, children);
+
+                        int totalFilesToDelete = children.size();
+                        children.sort((f1, f2) -> Integer.compare(f2.path.length(), f1.path.length()));
+
+                        for (int j = 0; j < totalFilesToDelete; j++) {
+                            ModelFilesActionResponse.FileInfo fileInfo2 = children.get(j);
+                            File source2 = new File(fileInfo2.path);
+
+                            if (!source2.delete()) {
+                                fails.add(new ModelFilesActionResponse.Fail(fileInfo2, new Exception("Fail delete file")));
+                            }
+
+                            managerOfThreads.safeAccept(callbackProgress, new ModelRequestProgress(j + 1, totalFilesToDelete, fileInfo2.name));
+                        }
+                    }
+                    if (dest.exists() || dest.mkdirs()) {
+                        success.add(fileInfo);
+                        if (destExists && request.duplicateNamePolicy == ModelFilesActionRequest.DuplicateNamePolicy.Rename) renamed.add(fileInfo);
+                        if (destExists && request.duplicateNamePolicy == ModelFilesActionRequest.DuplicateNamePolicy.Replace) replaced.add(fileInfo);
+                    } else {
+                        fails.add(new ModelFilesActionResponse.Fail(fileInfo, new Exception("Fail create folder")));
+                    }
+                } else {
+                    try (InputStream in = Files.newInputStream(source.toPath());
+                         OutputStream out = Files.newOutputStream(dest.toPath())
+                    ) {
+                        byte[] buf = new byte[8192];
+                        int len;
+                        while ((len = in.read(buf)) > 0) out.write(buf, 0, len);
+                        success.add(fileInfo);
+                        if (destExists && request.duplicateNamePolicy == ModelFilesActionRequest.DuplicateNamePolicy.Rename) renamed.add(fileInfo);
+                        if (destExists && request.duplicateNamePolicy == ModelFilesActionRequest.DuplicateNamePolicy.Replace) replaced.add(fileInfo);
+                    } catch (Exception e) {
+                        fails.add(new ModelFilesActionResponse.Fail(fileInfo, e));
+                    }
+                }
+            }
+
+            success.sort((f1, f2) -> Integer.compare(f2.path.length(), f1.path.length()));
+            int totalFilesToDelete = success.size();
+
+            for (int i = 0; i < totalFilesToDelete; i++) {
+                ModelFilesActionResponse.FileInfo fileInfo = success.get(i);
+                File source = new File(fileInfo.path);
+
+                managerOfThreads.safeAccept(callbackProgress, new ModelRequestProgress(i + 1, totalFilesToDelete, fileInfo.name));
+
+                if (!source.delete()) {
+                    fails.add(new ModelFilesActionResponse.Fail(fileInfo, new Exception("Fail delete file")));
+                }
+            }
+        };
+
+        Runnable copyAction = () -> {
+            int totalFiles = actionFiles.size();
+            actionFiles.sort(Comparator.comparingInt(f -> f.path.length()));
+
+            List<String> allPaths = actionFiles.stream().map(fileInfo -> fileInfo.path).collect(Collectors.toList());
+            String commonPath = findCommonPath.invoke(allPaths);
+
+            HashMap<ModelFilesActionResponse.FileInfo, String> newFilePaths = new HashMap<>();
+            boolean hasFoldersInActionFiles = actionFiles.stream().map(f -> f.isFolder ? 1 : 0).reduce(0, Integer::sum) != 0;
+            for (ModelFilesActionResponse.FileInfo fileInfo : actionFiles) {
+                String newFilePath = totalFiles > 1 && hasFoldersInActionFiles
+                        ? (request.targetPath + "/" + fileInfo.path.substring(commonPath.length())).replace("//", "/")
+                        : (request.targetPath + "/" + fileInfo.name).replace("//", "/");
+                newFilePaths.put(fileInfo, newFilePath);
+            }
+
+            for (int i = 0; i < totalFiles; i++) {
+                ModelFilesActionResponse.FileInfo fileInfo = actionFiles.get(i);
+                File source = new File(fileInfo.path);
+                File dest = new File(newFilePaths.get(fileInfo));
+                boolean destExists = dest.exists();
+
+                managerOfThreads.safeAccept(callbackProgress, new ModelRequestProgress(i + 1, totalFiles, fileInfo.name));
+
+                if (destExists && request.duplicateNamePolicy == ModelFilesActionRequest.DuplicateNamePolicy.Skip
+                        || Objects.equals(source.getAbsolutePath(), dest.getAbsolutePath())
+                ) {
+                    skipped.add(fileInfo);
+                    continue;
+                }
+
+                if (destExists && request.duplicateNamePolicy == ModelFilesActionRequest.DuplicateNamePolicy.Rename) {
+                    String oldPath = dest.getAbsolutePath();
+                    dest = createUniqueFile.invoke(dest);
+                    String newPath = dest.getAbsolutePath();
+                    if (fileInfo.isFolder) {
+                        for (ModelFilesActionResponse.FileInfo fi : actionFiles) {
+                            String newFilePath = newFilePaths.get(fi);
+                            if (newFilePath.startsWith(oldPath)) {
+                                newFilePaths.put(fi, newPath + "/" + newFilePath.substring(oldPath.length()).replace("//", "/"));
+                            }
+                        }
+                    }
+                }
+
+                if (source.isDirectory()) {
+                    if (dest.exists()) {
+                        List<ModelFilesActionResponse.FileInfo> children = new ArrayList<>();
+                        collectChildrenFilesInfo(dest, children);
+
+                        int totalFilesToDelete = children.size();
+                        children.sort((f1, f2) -> Integer.compare(f2.path.length(), f1.path.length()));
+
+                        for (int j = 0; j < totalFilesToDelete; j++) {
+                            ModelFilesActionResponse.FileInfo fileInfo2 = children.get(j);
+                            File source2 = new File(fileInfo2.path);
+
+                            if (!source2.delete()) {
+                                fails.add(new ModelFilesActionResponse.Fail(fileInfo2, new Exception("Fail delete file")));
+                            }
+
+                            managerOfThreads.safeAccept(callbackProgress, new ModelRequestProgress(j + 1, totalFilesToDelete, fileInfo2.name));
+                        }
+                    }
+                    if (dest.exists() || dest.mkdirs()) {
+                        success.add(fileInfo);
+                        if (destExists && request.duplicateNamePolicy == ModelFilesActionRequest.DuplicateNamePolicy.Rename) renamed.add(fileInfo);
+                        if (destExists && request.duplicateNamePolicy == ModelFilesActionRequest.DuplicateNamePolicy.Replace) replaced.add(fileInfo);
+                    } else {
+                        fails.add(new ModelFilesActionResponse.Fail(fileInfo, new Exception("Fail create folder")));
+                    }
+                } else {
+                    try (InputStream in = Files.newInputStream(source.toPath());
+                         OutputStream out = Files.newOutputStream(dest.toPath())
+                    ) {
+                        byte[] buf = new byte[8192];
+                        int len;
+                        while ((len = in.read(buf)) > 0) out.write(buf, 0, len);
+                        success.add(fileInfo);
+                        if (destExists && request.duplicateNamePolicy == ModelFilesActionRequest.DuplicateNamePolicy.Rename) renamed.add(fileInfo);
+                        if (destExists && request.duplicateNamePolicy == ModelFilesActionRequest.DuplicateNamePolicy.Replace) replaced.add(fileInfo);
+                    } catch (Exception e) {
+                        fails.add(new ModelFilesActionResponse.Fail(fileInfo, e));
+                    }
+                }
+            }
+        };
+
+        Runnable runAction = () -> {
+            Exception globalError = null;
+
+            if (request.action == ModelFilesActionRequest.FilesAction.Delete) {
+                collectChildrenForRequestFiles.run();
+                deleteAction.run();
+            }
+
+            if (request.action == ModelFilesActionRequest.FilesAction.Replace) {
+                globalError = createFolderIfNotExists.get();
+                if (globalError == null) {
+                    collectChildrenForRequestFiles.run();
+                    replaceAction.run();
+                }
+            }
+
+            if (request.action == ModelFilesActionRequest.FilesAction.Copy) {
+                globalError = createFolderIfNotExists.get();
+                if (globalError == null) {
+                    collectChildrenForRequestFiles.run();
+                    copyAction.run();
+                }
+            }
+
+            if (request.action == ModelFilesActionRequest.FilesAction.CreateFolder) {
+                globalError = createFolderIfNotExists.get();
+                if (globalError == null) {
+                    ModelFilesActionResponse.FileInfo folderInfo = new ModelFilesActionResponse.FileInfo(
+                            request.targetPath,
+                            request.targetPath.substring(request.targetPath.lastIndexOf("/")),
+                            true
+                    );
+                    success.add(folderInfo);
+                }
+            }
+
+            ModelFilesActionResponse response = new ModelFilesActionResponse(
+                    globalError,
+                    new ReadOnlyList<>(success),
+                    new ReadOnlyList<>(skipped),
+                    new ReadOnlyList<>(renamed),
+                    new ReadOnlyList<>(replaced),
+                    new ReadOnlyList<>(fails)
+            );
+
+            managerOfThreads.safeAccept(callbackResult, response);
+        };
+
+        managerOfThreads.executeAsync(runAction);
+    }
+
+    private void collectChildrenFilesInfo(File folder, List<ModelFilesActionResponse.FileInfo> collectList) {
+        File[] children = folder.listFiles();
+        collectList.add(new ModelFilesActionResponse.FileInfo(folder.getName(), folder.getAbsolutePath(), true));
+        if (children != null) {
+            for (File child : children) {
+                if (child.isDirectory()) {
+                    collectChildrenFilesInfo(child, collectList);
+                } else {
+                    collectList.add(new ModelFilesActionResponse.FileInfo(child.getName(), child.getAbsolutePath(), false));
+                }
+            }
+        }
     }
 
     private void storageRecursionScanning(File folder, List<ModelMediaFile> files, ModelFilters filters, ModelScanParams.StorageParams scanParams) {

@@ -2,6 +2,7 @@ package com.nti.nice_gallery.views.buttons;
 
 import android.content.Context;
 import android.util.AttributeSet;
+import android.view.View;
 import android.view.animation.Animation;
 import android.view.animation.AnimationUtils;
 
@@ -26,6 +27,14 @@ public class ButtonBase extends androidx.appcompat.widget.AppCompatImageButton {
 
     private void init() {
         setOnClickListener(null);
+    }
+
+    @Override
+    public void setVisibility(int visibility) {
+        super.setVisibility(visibility);
+        if (visibility != View.VISIBLE) {
+            clearAnimation();
+        }
     }
 
     @Override

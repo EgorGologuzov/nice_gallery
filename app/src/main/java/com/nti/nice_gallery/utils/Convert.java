@@ -3,6 +3,8 @@ package com.nti.nice_gallery.utils;
 import android.content.Context;
 import android.util.Size;
 
+import androidx.annotation.ArrayRes;
+
 import com.nti.nice_gallery.R;
 
 import java.text.SimpleDateFormat;
@@ -94,4 +96,9 @@ public class Convert {
 
         return null;
     }
+
+    public <T extends Enum<T>> String enumValueToStringArrayValue(T value, @ArrayRes int stringArr) {
+        String[] strings = context.getResources().getStringArray(stringArr);
+        return strings[value.ordinal()];
+    };
 }

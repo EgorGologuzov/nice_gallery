@@ -1,5 +1,6 @@
 package com.nti.nice_gallery.data;
 
+import com.nti.nice_gallery.models.ModelFilesActionRequest;
 import com.nti.nice_gallery.models.ModelFilters;
 import com.nti.nice_gallery.models.ModelGetFilesRequest;
 import com.nti.nice_gallery.models.ModelScanParams;
@@ -18,4 +19,7 @@ public interface IManagerOfSettings {
 
     ModelGetFilesRequest.SortVariant getSortVariant();
     void saveSortVariant(ModelGetFilesRequest.SortVariant variant);
+
+    ModelFilesActionRequest.FilesAction getLastFilesAction();
+    void saveLastFilesAction(ModelFilesActionRequest.FilesAction action);
 }

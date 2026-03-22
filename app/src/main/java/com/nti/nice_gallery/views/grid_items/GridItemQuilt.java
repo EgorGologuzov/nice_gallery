@@ -41,6 +41,7 @@ public class GridItemQuilt extends GridItemBase {
 
         infoView = findViewById(R.id.infoView);
         imageView = findViewById(R.id.imageView);
+        checkBox = findViewById(R.id.checkBox);
 
         managerOfFiles = Domain.getManagerOfFiles(getContext());
         managerOfThreads = new ManagerOfThreads(getContext());

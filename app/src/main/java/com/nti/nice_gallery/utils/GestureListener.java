@@ -9,7 +9,7 @@ import java.util.function.Consumer;
 
 public class GestureListener extends GestureDetector.SimpleOnGestureListener {
 
-    public enum Gesture { Tap, DoubleTap, LongPress, SwipeLeft, SwipeRight, SwipeUp, SwipeDown, Scroll}
+    public enum Gesture { Down, Tap, DoubleTap, ShortPress, LongPress, SwipeLeft, SwipeRight, SwipeUp, SwipeDown, Scroll}
 
     public static class GestureArgs {
         public final Gesture gesture;
@@ -56,6 +56,21 @@ public class GestureListener extends GestureDetector.SimpleOnGestureListener {
         }
 
         return true;
+    }
+
+    @Override
+    public void onShowPress(MotionEvent e) {
+        if (gestureDetectedListener != null) {
+            GestureArgs gestureArgs = new GestureArgs(
+                    Gesture.ShortPress,
+                    (int) e.getX(),
+                    (int) e.getY(),
+                    null,
+                    null
+            );
+
+            gestureDetectedListener.accept(gestureArgs);
+        }
     }
 
     @Override
@@ -150,6 +165,19 @@ public class GestureListener extends GestureDetector.SimpleOnGestureListener {
     public boolean onDown(@NonNull MotionEvent e) {
         downX = e.getX();
         downY = e.getY();
+
+        if (gestureDetectedListener != null) {
+            GestureArgs gestureArgs = new GestureArgs(
+                    Gesture.Down,
+                    (int) downX,
+                    (int) downY,
+                    null,
+                    null
+            );
+
+            gestureDetectedListener.accept(gestureArgs);
+        }
+
         return true;
     }
 }

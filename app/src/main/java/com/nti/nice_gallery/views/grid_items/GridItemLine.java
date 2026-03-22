@@ -3,6 +3,8 @@ package com.nti.nice_gallery.views.grid_items;
 import android.content.Context;
 import android.util.AttributeSet;
 import android.util.Log;
+import android.view.View;
+import android.widget.CheckBox;
 import android.widget.ImageView;
 import android.widget.TextView;
 
@@ -58,6 +60,8 @@ public class GridItemLine extends GridItemBase {
         pathView = findViewById(R.id.itemPathView);
         infoView = findViewById(R.id.infoView);
         infoView2 = findViewById(R.id.infoView2);
+        checkBox = findViewById(R.id.checkBox);
+
         managerOfFiles = Domain.getManagerOfFiles(getContext());
         managerOfThreads = new ManagerOfThreads(getContext());
         convert = new Convert(getContext());

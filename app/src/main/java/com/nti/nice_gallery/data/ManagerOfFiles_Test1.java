@@ -8,6 +8,8 @@ import android.util.Size;
 import androidx.core.content.ContextCompat;
 
 import com.nti.nice_gallery.R;
+import com.nti.nice_gallery.models.ModelFilesActionRequest;
+import com.nti.nice_gallery.models.ModelFilesActionResponse;
 import com.nti.nice_gallery.models.ModelGetFilesRequest;
 import com.nti.nice_gallery.models.ModelGetFilesResponse;
 import com.nti.nice_gallery.models.ModelGetPreviewRequest;
@@ -15,6 +17,7 @@ import com.nti.nice_gallery.models.ModelGetPreviewResponse;
 import com.nti.nice_gallery.models.ModelGetStoragesRequest;
 import com.nti.nice_gallery.models.ModelGetStoragesResponse;
 import com.nti.nice_gallery.models.ModelMediaFile;
+import com.nti.nice_gallery.models.ModelRequestProgress;
 import com.nti.nice_gallery.models.ModelStorage;
 import com.nti.nice_gallery.utils.ManagerOfThreads;
 import com.nti.nice_gallery.utils.ReadOnlyList;
@@ -246,6 +249,11 @@ public class ManagerOfFiles_Test1 implements IManagerOfFiles {
         );
 
         managerOfThreads.safeAccept(callback, response);
+    }
+
+    @Override
+    public void executeAction(ModelFilesActionRequest request, Consumer<ModelFilesActionResponse> callbackResult, Consumer<ModelRequestProgress> callbackProgress) {
+
     }
 
     // Возращает примерный список хранилищ

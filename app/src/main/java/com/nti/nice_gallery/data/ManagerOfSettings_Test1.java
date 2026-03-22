@@ -2,6 +2,7 @@ package com.nti.nice_gallery.data;
 
 import android.content.Context;
 
+import com.nti.nice_gallery.models.ModelFilesActionRequest;
 import com.nti.nice_gallery.models.ModelFilters;
 import com.nti.nice_gallery.models.ModelGetFilesRequest;
 import com.nti.nice_gallery.models.ModelScanParams;
@@ -15,6 +16,7 @@ public class ManagerOfSettings_Test1 implements IManagerOfSettings{
     private static ModelFilters filters;
     private static ViewMediaGrid.GridVariant gridVariant = ViewMediaGrid.GridVariant.List;
     private static ModelGetFilesRequest.SortVariant sortVariant = ModelGetFilesRequest.SortVariant.ByCreateAtDesc;
+    private static ModelFilesActionRequest.FilesAction lastFilesAction = ModelFilesActionRequest.FilesAction.Copy;
 
     public ManagerOfSettings_Test1(Context context) {
         this.context = context;
@@ -74,5 +76,15 @@ public class ManagerOfSettings_Test1 implements IManagerOfSettings{
     @Override
     public void saveSortVariant(ModelGetFilesRequest.SortVariant variant) {
         this.sortVariant = variant;
+    }
+
+    @Override
+    public ModelFilesActionRequest.FilesAction getLastFilesAction() {
+        return lastFilesAction;
+    }
+
+    @Override
+    public void saveLastFilesAction(ModelFilesActionRequest.FilesAction action) {
+        this.lastFilesAction = action;
     }
 }

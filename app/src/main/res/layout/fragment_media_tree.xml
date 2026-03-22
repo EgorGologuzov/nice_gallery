@@ -8,6 +8,7 @@
     <com.nti.nice_gallery.views.ViewActionBar
         android:id="@+id/viewActionBar"
         style="@style/Custom_ActionBar">
+
         <com.nti.nice_gallery.views.buttons.ButtonPathsStack
             android:id="@+id/buttonPathStack"
             style="@style/Custom_ActionBar_Button" />
@@ -26,7 +27,41 @@
         <com.nti.nice_gallery.views.buttons.ButtonScanningReport
             android:id="@+id/buttonScanningReport"
             style="@style/Custom_ActionBar_Button" />
+        <com.nti.nice_gallery.views.buttons.ButtonCreateFolder
+            android:id="@+id/buttonCreateFolder"
+            style="@style/Custom_ActionBar_Button" />
+
+        <com.nti.nice_gallery.views.buttons.ButtonSelectAll
+            android:id="@+id/buttonSelectAll"
+            android:visibility="gone"
+            style="@style/Custom_ActionBar_Button" />
+        <com.nti.nice_gallery.views.buttons.ButtonReplaceFiles
+            android:id="@+id/buttonReplaceFiles"
+            android:visibility="gone"
+            style="@style/Custom_ActionBar_Button" />
+        <com.nti.nice_gallery.views.buttons.ButtonCopyFiles
+            android:id="@+id/buttonCopyFiles"
+            android:visibility="gone"
+            style="@style/Custom_ActionBar_Button" />
+        <com.nti.nice_gallery.views.buttons.ButtonDeleteFiles
+            android:id="@+id/buttonDeleteFiles"
+            android:visibility="gone"
+            style="@style/Custom_ActionBar_Button" />
+        <com.nti.nice_gallery.views.buttons.ButtonCancel
+            android:id="@+id/buttonCancel"
+            android:visibility="gone"
+            style="@style/Custom_ActionBar_Button" />
+
     </com.nti.nice_gallery.views.ViewActionBar>
+
+    <TextView
+        android:id="@+id/textStatusInfo"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="[Status info]"
+        android:padding="4dp"
+        android:textAlignment="center"
+        android:visibility="gone"/>
 
     <com.nti.nice_gallery.views.ViewMediaGrid
         android:id="@+id/viewMediaGrid"

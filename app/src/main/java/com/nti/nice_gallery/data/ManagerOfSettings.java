@@ -2,13 +2,11 @@ package com.nti.nice_gallery.data;
 
 import android.content.Context;
 
+import com.nti.nice_gallery.models.ModelFilesActionRequest;
 import com.nti.nice_gallery.models.ModelFilters;
 import com.nti.nice_gallery.models.ModelGetFilesRequest;
 import com.nti.nice_gallery.models.ModelScanParams;
 import com.nti.nice_gallery.views.ViewMediaGrid;
-
-import java.util.Collections;
-import java.util.List;
 
 public class ManagerOfSettings implements IManagerOfSettings {
 
@@ -55,6 +53,16 @@ public class ManagerOfSettings implements IManagerOfSettings {
 
     @Override
     public void saveSortVariant(ModelGetFilesRequest.SortVariant variant) {
+
+    }
+
+    @Override
+    public ModelFilesActionRequest.FilesAction getLastFilesAction() {
+        return null;
+    }
+
+    @Override
+    public void saveLastFilesAction(ModelFilesActionRequest.FilesAction action) {
 
     }
 }
