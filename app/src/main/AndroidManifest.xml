@@ -28,7 +28,6 @@
 
         <activity android:name=".activities.ActivityFilters" />
         <activity android:name=".activities.ActivityMediaView" />
-        <activity android:name=".activities.ActivityFolderChoice" />
 
         <!-- Провайдер для доступа к файлам -->
         <provider

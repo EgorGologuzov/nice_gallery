@@ -20,6 +20,7 @@ import java.util.function.Consumer;
 
 public class ButtonCopyFiles extends ButtonBase {
 
+    private String basePath = "/storage/emulated/0";
     private HashMap<String, ModelMediaFile> files;
     private Consumer<ButtonCopyFiles> actionFinishedListener;
     private Consumer<ButtonCopyFiles> actionProgressListener;
@@ -55,6 +56,10 @@ public class ButtonCopyFiles extends ButtonBase {
         convert = new Convert(getContext());
         setImageResource(R.drawable.baseline_content_copy_24);
         setOnClickListener(v -> onClick());
+    }
+
+    public void setBasePath(String basePath) {
+        this.basePath = basePath;
     }
 
     public void setFiles(HashMap<String, ModelMediaFile> files) {
@@ -129,6 +134,6 @@ public class ButtonCopyFiles extends ButtonBase {
             );
         };
 
-        managerOfDialogs.showChoicePath("/storage/emulated/0/", onPathChosen, null);
+        managerOfDialogs.showChoicePath((basePath + "/").replace("//", "/"), onPathChosen, null);
     }
 }

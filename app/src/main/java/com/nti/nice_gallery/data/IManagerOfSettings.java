@@ -4,6 +4,7 @@ import com.nti.nice_gallery.models.ModelFilesActionRequest;
 import com.nti.nice_gallery.models.ModelFilters;
 import com.nti.nice_gallery.models.ModelGetFilesRequest;
 import com.nti.nice_gallery.models.ModelScanParams;
+import com.nti.nice_gallery.utils.ReadOnlyList;
 import com.nti.nice_gallery.views.ViewMediaGrid;
 
 public interface IManagerOfSettings {
@@ -22,4 +23,7 @@ public interface IManagerOfSettings {
 
     ModelFilesActionRequest.FilesAction getLastFilesAction();
     void saveLastFilesAction(ModelFilesActionRequest.FilesAction action);
+
+    ReadOnlyList<String> getPathsHistory();
+    void savePathToHistory(String path);
 }

@@ -27,6 +27,9 @@
         <com.nti.nice_gallery.views.buttons.ButtonScanningReport
             android:id="@+id/buttonScanningReport"
             style="@style/Custom_ActionBar_Button" />
+        <com.nti.nice_gallery.views.buttons.ButtonFastNavigation
+            android:id="@+id/buttonFastNavigation"
+            style="@style/Custom_ActionBar_Button" />
         <com.nti.nice_gallery.views.buttons.ButtonCreateFolder
             android:id="@+id/buttonCreateFolder"
             style="@style/Custom_ActionBar_Button" />
@@ -60,6 +63,8 @@
         android:layout_height="wrap_content"
         android:text="[Status info]"
         android:padding="4dp"
+        android:maxLines="1"
+        android:ellipsize="end"
         android:textAlignment="center"
         android:visibility="gone"/>
 

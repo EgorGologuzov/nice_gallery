@@ -2,6 +2,7 @@ package com.nti.nice_gallery.views.buttons;
 
 import android.content.Context;
 import android.util.AttributeSet;
+import android.view.View;
 
 import com.nti.nice_gallery.R;
 import com.nti.nice_gallery.data.ManagerOfFiles;
@@ -16,10 +17,12 @@ import com.nti.nice_gallery.utils.ManagerOfThreads;
 import com.nti.nice_gallery.utils.ReadOnlyList;
 
 import java.util.HashMap;
+import java.util.Objects;
 import java.util.function.Consumer;
 
 public class ButtonReplaceFiles extends ButtonBase {
 
+    private String basePath = "/storage/emulated/0";
     private HashMap<String, ModelMediaFile> files;
     private Consumer<ButtonReplaceFiles> actionFinishedListener;
     private Consumer<ButtonReplaceFiles> actionProgressListener;
@@ -55,6 +58,10 @@ public class ButtonReplaceFiles extends ButtonBase {
         convert = new Convert(getContext());
         setImageResource(R.drawable.baseline_drive_file_move_rtl_24);
         setOnClickListener(v -> onClick());
+    }
+
+    public void setBasePath(String basePath) {
+        this.basePath = basePath;
     }
 
     public void setFiles(HashMap<String, ModelMediaFile> files) {
@@ -129,6 +136,6 @@ public class ButtonReplaceFiles extends ButtonBase {
             );
         };
 
-        managerOfDialogs.showChoicePath("/storage/emulated/0/", onPathChosen, null);
+        managerOfDialogs.showChoicePath((basePath + "/").replace("//", "/"), onPathChosen, null);
     }
 }

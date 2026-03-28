@@ -38,6 +38,7 @@ import com.nti.nice_gallery.views.buttons.ButtonChoiceSortVariant;
 import com.nti.nice_gallery.views.buttons.ButtonCopyFiles;
 import com.nti.nice_gallery.views.buttons.ButtonCreateFolder;
 import com.nti.nice_gallery.views.buttons.ButtonDeleteFiles;
+import com.nti.nice_gallery.views.buttons.ButtonFastNavigation;
 import com.nti.nice_gallery.views.buttons.ButtonPathsStack;
 import com.nti.nice_gallery.views.buttons.ButtonRefresh;
 import com.nti.nice_gallery.views.buttons.ButtonReplaceFiles;
@@ -79,6 +80,7 @@ public class FragmentMediaTree extends Fragment {
         ButtonRefresh buttonRefresh = view.findViewById(R.id.buttonRefresh);
         ButtonScanningReport buttonScanningReport = view.findViewById(R.id.buttonScanningReport);
         ButtonCreateFolder buttonCreateFolder = view.findViewById(R.id.buttonCreateFolder);
+        ButtonFastNavigation buttonFastNavigation = view.findViewById(R.id.buttonFastNavigation);
         ButtonSelectAll buttonSelectAll = view.findViewById(R.id.buttonSelectAll);
         ButtonReplaceFiles buttonReplaceFiles = view.findViewById(R.id.buttonReplaceFiles);
         ButtonCopyFiles buttonCopyFiles = view.findViewById(R.id.buttonCopyFiles);
@@ -202,7 +204,11 @@ public class FragmentMediaTree extends Fragment {
 
         Consumer<ButtonPathsStack> onCurrentPathChange = btn -> {
             refreshFilesList.run();
-            buttonCreateFolder.setBasePath(buttonPathsStack.getTopPath());
+            String currentPath = buttonPathsStack.getTopPath();
+            buttonCreateFolder.setBasePath(currentPath);
+            buttonReplaceFiles.setBasePath(currentPath);
+            buttonCopyFiles.setBasePath(currentPath);
+            buttonFastNavigation.setBasePath(currentPath);
         };
 
         Consumer<ButtonChoiceGridVariant> onGridVariantChange = btn -> {
@@ -224,6 +230,7 @@ public class FragmentMediaTree extends Fragment {
             buttonFilters.setVisibility(commonButtonsVisibility);
             buttonRefresh.setVisibility(commonButtonsVisibility);
             buttonScanningReport.setVisibility(commonButtonsVisibility);
+            buttonFastNavigation.setVisibility(commonButtonsVisibility);
             buttonCreateFolder.setVisibility(commonButtonsVisibility);
 
             buttonSelectAll.setVisibility(selectedModeButtonsVisibility);
@@ -279,6 +286,7 @@ public class FragmentMediaTree extends Fragment {
         buttonGridVariant.setVariantChangeListener(onGridVariantChange);
         buttonSortVariant.setVariantChangeListener(onSortVariantChange);
         buttonRefresh.setRefreshListener(refreshFilesList);
+        buttonFastNavigation.setOnSelectedListener(btn -> buttonPathsStack.addTopItem(btn.getSelectedPath()));
         buttonCreateFolder.setActionFinishedListener(onActionFinished);
 
         buttonSelectAll.setSelectedFilesChangedListener(btn -> onSelectedFilesChanged.run());

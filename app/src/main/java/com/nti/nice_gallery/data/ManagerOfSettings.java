@@ -6,6 +6,7 @@ import com.nti.nice_gallery.models.ModelFilesActionRequest;
 import com.nti.nice_gallery.models.ModelFilters;
 import com.nti.nice_gallery.models.ModelGetFilesRequest;
 import com.nti.nice_gallery.models.ModelScanParams;
+import com.nti.nice_gallery.utils.ReadOnlyList;
 import com.nti.nice_gallery.views.ViewMediaGrid;
 
 public class ManagerOfSettings implements IManagerOfSettings {
@@ -63,6 +64,16 @@ public class ManagerOfSettings implements IManagerOfSettings {
 
     @Override
     public void saveLastFilesAction(ModelFilesActionRequest.FilesAction action) {
+
+    }
+
+    @Override
+    public ReadOnlyList<String> getPathsHistory() {
+        return null;
+    }
+
+    @Override
+    public void savePathToHistory(String path) {
 
     }
 }
