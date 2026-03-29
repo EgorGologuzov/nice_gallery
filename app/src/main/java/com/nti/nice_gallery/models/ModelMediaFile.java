@@ -18,7 +18,6 @@ public class ModelMediaFile {
             new ModelFileFormat("image/avif", "avif", Type.Image),
             new ModelFileFormat("image/gif", "gif", Type.Image),
             new ModelFileFormat("image/heic", "heic", Type.Image),
-            new ModelFileFormat("image/tif", "tif", Type.Image),
             new ModelFileFormat("image/webp", "webp", Type.Image),
             new ModelFileFormat("video/mp4", "mp4", Type.Video),
             new ModelFileFormat("video/x-ms-wmv", "wmv", Type.Video),

@@ -62,11 +62,12 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="[Status info]"
-        android:padding="4dp"
+        android:paddingBottom="4dp"
+        android:paddingRight="4dp"
+        android:paddingLeft="4dp"
         android:maxLines="1"
-        android:ellipsize="end"
-        android:textAlignment="center"
-        android:visibility="gone"/>
+        android:ellipsize="middle"
+        android:textAlignment="center" />
 
     <com.nti.nice_gallery.views.ViewMediaGrid
         android:id="@+id/viewMediaGrid"

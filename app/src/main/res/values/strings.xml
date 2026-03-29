@@ -46,6 +46,7 @@
     <string name="format_message_file_type_file">[Файл] %s;</string>
     <string name="format_message_file_type_other">[] %s;</string>
     <string name="format_status_info_action_progress">Обработка: %s (%d/%d)</string>
+    <string name="format_status_info_response_report">Найдено файлов: %d</string>
 
 <!--Symbols-->
     <string name="symbol_dot_separator">" • "</string>
@@ -65,6 +66,8 @@
     <string name="message_scanning_report_source_not_set">Не установлен источник данных</string>
     <string name="message_no_child_folders">Нет дочерних папок</string>
     <string name="message_no_last_folders">Нет последних путей</string>
+    <string name="message_something_wrong">Что-то пошло не так</string>
+    <string name="message_request_handling">Обработка запроса…</string>
     <!--Errors-->
     <string name="message_error_load_file_info_failed">Ошибка загрузки информации о файле</string>
     <string name="message_error_scanning_failed">Ошибка при сканировании</string>

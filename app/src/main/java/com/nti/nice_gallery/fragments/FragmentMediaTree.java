@@ -2,6 +2,7 @@ package com.nti.nice_gallery.fragments;
 
 import android.os.Bundle;
 
+import androidx.annotation.StringRes;
 import androidx.fragment.app.Fragment;
 
 import android.view.LayoutInflater;
@@ -25,6 +26,7 @@ import com.nti.nice_gallery.models.ModelGetFilesResponse;
 import com.nti.nice_gallery.models.ModelMediaFile;
 import com.nti.nice_gallery.models.ModelRequestProgress;
 import com.nti.nice_gallery.models.ModelScanParams;
+import com.nti.nice_gallery.utils.CallbackShell;
 import com.nti.nice_gallery.utils.ManagerOfDialogs;
 import com.nti.nice_gallery.utils.ManagerOfNavigation;
 import com.nti.nice_gallery.utils.ManagerOfThreads;
@@ -61,6 +63,9 @@ public class FragmentMediaTree extends Fragment {
     private static boolean isSelectedMode = false;
     private static HashMap<String, ModelMediaFile> selectedFiles;
     private static boolean isBusy = false;
+    private static String statusInfo = null;
+    private static final CallbackShell.ForRunnable onActionFinishedShell = new CallbackShell.ForRunnable();
+    private static final CallbackShell.ForConsumer<ModelRequestProgress> onActionProgressShell = new CallbackShell.ForConsumer<>();
 
     private ModelGetFilesRequest request;
     private ModelGetFilesResponse response;
@@ -141,16 +146,20 @@ public class FragmentMediaTree extends Fragment {
             );
         };
 
+        Runnable onStatusInfoChanged = () -> {
+            textStatusInfo.setText(statusInfo);
+        };
+
         Runnable refreshFilesList = () -> {
             request = buildRequest.get();
             viewMediaGrid.trySetStateScanningInProgress(true);
             managerOfFiles.getFilesAsync(request, response -> {
                 managerOfThreads.runOnUiThread(() -> {
                     FragmentMediaTree.this.response = response;
+                    buttonScanningReport.setSource(response);
                     if (response.error == null) {
                         viewMediaGrid.setMediaFiles(response.files);
                         viewMediaGrid.trySetStateScanningInProgress(false);
-                        buttonScanningReport.setSource(response);
                         buttonSelectAll.setAllFiles(response.files);
                     } else {
                         viewMediaGrid.trySetStateScanningInProgress(false);
@@ -175,49 +184,6 @@ public class FragmentMediaTree extends Fragment {
 
                 managerOfNavigation.navigate(ActivityMediaView.class, payload);
             }
-        };
-
-        Consumer<ActivityMain> onBackButtonPressed = a -> {
-            if (!isSelectedMode) {
-                buttonPathsStack.removeTopItem();
-            }
-        };
-
-        Runnable onIsBusyChanged = () -> {
-            if (isBusy) {
-                viewActionBar.setIsEnabled(false);
-                textStatusInfo.setVisibility(View.VISIBLE);
-            } else {
-                viewActionBar.setIsEnabled(true);
-                textStatusInfo.setVisibility(View.GONE);
-            }
-        };
-
-        Consumer<ViewMediaGrid> onViewMediaGridStateChangeListener = v -> {
-            boolean currentIsBusy = isBusy;
-            isBusy = v.getState() != ViewMediaGrid.CurrentWork.Standby;
-            if (currentIsBusy != isBusy) {
-                textStatusInfo.setText(R.string.message_loading_in_progress);
-                onIsBusyChanged.run();
-            }
-        };
-
-        Consumer<ButtonPathsStack> onCurrentPathChange = btn -> {
-            refreshFilesList.run();
-            String currentPath = buttonPathsStack.getTopPath();
-            buttonCreateFolder.setBasePath(currentPath);
-            buttonReplaceFiles.setBasePath(currentPath);
-            buttonCopyFiles.setBasePath(currentPath);
-            buttonFastNavigation.setBasePath(currentPath);
-        };
-
-        Consumer<ButtonChoiceGridVariant> onGridVariantChange = btn -> {
-            viewMediaGrid.setGridVariant(btn.getSelectedVariant());
-        };
-
-        Consumer<ButtonChoiceSortVariant> onSortVariantChange = btn -> {
-            updateRequestSortVariant.accept(btn.getSelectedVariant());
-            refreshFilesList.run();
         };
 
         Runnable onSelectedModeChange = () -> {
@@ -257,7 +223,53 @@ public class FragmentMediaTree extends Fragment {
             viewMediaGrid.setSelectedFiles(selectedFiles);
         };
 
-        Consumer onActionFinished = __ -> {
+        Consumer<ActivityMain> onBackButtonPressed = a -> {
+            if (!isSelectedMode) {
+                buttonPathsStack.removeTopItem();
+            } else {
+                cancelSelectedMode.run();
+            }
+        };
+
+        Runnable onIsBusyChanged = () -> {
+            if (isBusy) {
+                viewActionBar.setIsEnabled(false);
+                statusInfo = tryGetString(R.string.message_request_handling);
+                onStatusInfoChanged.run();
+            } else {
+                viewActionBar.setIsEnabled(true);
+                statusInfo = buttonPathsStack.getTopPath();
+                onStatusInfoChanged.run();
+            }
+        };
+
+        Consumer<ViewMediaGrid> onViewMediaGridStateChangeListener = v -> {
+            boolean currentIsBusy = isBusy;
+            isBusy = v.getState() != ViewMediaGrid.CurrentWork.Standby;
+            if (currentIsBusy != isBusy) {
+                onIsBusyChanged.run();
+            }
+        };
+
+        Consumer<ButtonPathsStack> onCurrentPathChange = btn -> {
+            refreshFilesList.run();
+            String currentPath = buttonPathsStack.getTopPath();
+            buttonCreateFolder.setBasePath(currentPath);
+            buttonReplaceFiles.setBasePath(currentPath);
+            buttonCopyFiles.setBasePath(currentPath);
+            buttonFastNavigation.setBasePath(currentPath);
+        };
+
+        Consumer<ButtonChoiceGridVariant> onGridVariantChange = btn -> {
+            viewMediaGrid.setGridVariant(btn.getSelectedVariant());
+        };
+
+        Consumer<ButtonChoiceSortVariant> onSortVariantChange = btn -> {
+            updateRequestSortVariant.accept(btn.getSelectedVariant());
+            refreshFilesList.run();
+        };
+
+        Runnable onActionFinished = () -> {
             managerOfThreads.runOnUiThread(() -> {
                 cancelSelectedMode.run();
                 refreshFilesList.run();
@@ -268,7 +280,8 @@ public class FragmentMediaTree extends Fragment {
 
         Consumer<ModelRequestProgress> onActionProgress = progress -> {
             managerOfThreads.runOnUiThread(() -> {
-                textStatusInfo.setText(getString(R.string.format_status_info_action_progress, progress.currentStep, progress.numberCompletedSteps, progress.numberTotalSteps));
+                statusInfo = tryGetString(R.string.format_status_info_action_progress, progress.currentStep, progress.numberCompletedSteps, progress.numberTotalSteps);
+                onStatusInfoChanged.run();
                 if (!isBusy) {
                     isBusy = true;
                     onIsBusyChanged.run();
@@ -277,6 +290,9 @@ public class FragmentMediaTree extends Fragment {
         };
 
         activityMain.setBackButtonPressedListener(this, onBackButtonPressed);
+
+        onActionProgressShell.setCallback(onActionProgress);
+        onActionFinishedShell.setCallback(onActionFinished);
 
         viewMediaGrid.setStateChangeListener(onViewMediaGridStateChangeListener);
         viewMediaGrid.setItemClickListener(onGridItemClick);
@@ -287,15 +303,15 @@ public class FragmentMediaTree extends Fragment {
         buttonSortVariant.setVariantChangeListener(onSortVariantChange);
         buttonRefresh.setRefreshListener(refreshFilesList);
         buttonFastNavigation.setOnSelectedListener(btn -> buttonPathsStack.addTopItem(btn.getSelectedPath()));
-        buttonCreateFolder.setActionFinishedListener(onActionFinished);
+        buttonCreateFolder.setActionFinishedListener(btn -> onActionFinishedShell.invokeCallback());
 
         buttonSelectAll.setSelectedFilesChangedListener(btn -> onSelectedFilesChanged.run());
-        buttonReplaceFiles.setActionFinishedListener(onActionFinished);
-        buttonReplaceFiles.setActionProgressListener(btn -> onActionProgress.accept(btn.getProgress()));
-        buttonCopyFiles.setActionFinishedListener(onActionFinished);
-        buttonCopyFiles.setActionProgressListener(btn -> onActionProgress.accept(btn.getProgress()));
-        buttonDeleteFiles.setActionFinishedListener(onActionFinished);
-        buttonDeleteFiles.setActionProgressListener(btn -> onActionProgress.accept(btn.getProgress()));
+        buttonReplaceFiles.setActionFinishedListener(btn -> onActionFinishedShell.invokeCallback());
+        buttonReplaceFiles.setActionProgressListener(btn -> onActionProgressShell.invokeCallback(btn.getProgress()));
+        buttonCopyFiles.setActionFinishedListener(btn -> onActionFinishedShell.invokeCallback());
+        buttonCopyFiles.setActionProgressListener(btn -> onActionProgressShell.invokeCallback(btn.getProgress()));
+        buttonDeleteFiles.setActionFinishedListener(btn -> onActionFinishedShell.invokeCallback());
+        buttonDeleteFiles.setActionProgressListener(btn -> onActionProgressShell.invokeCallback(btn.getProgress()));
         buttonCancel.setOnClickListener(btn -> cancelSelectedMode.run());
 
         buttonPathsStack.setPathsStack(pathStack);
@@ -310,6 +326,13 @@ public class FragmentMediaTree extends Fragment {
         viewMediaGrid.setSelectedMode(isSelectedMode);
 
         return view;
+    }
+    
+    private String tryGetString(@StringRes int resId, Object... formatArgs) {
+        if (isAdded()) {
+            return getString(resId, formatArgs);
+        }
+        return null;
     }
 
     private ModelGetFilesRequest getTestRequest() {
