@@ -67,7 +67,7 @@ public class ButtonFastNavigation extends ButtonBase {
         };
 
         managerOfDialogs.showChoicePath(
-                basePath,
+                (basePath + "/").replace("//", "/"),
                 onChoice,
                 null
         );
