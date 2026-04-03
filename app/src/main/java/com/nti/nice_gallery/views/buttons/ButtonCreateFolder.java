@@ -83,6 +83,6 @@ public class ButtonCreateFolder extends ButtonBase {
             managerOfDialogs.showActionConfirm(request, onActionConfirm, null);
         };
 
-        managerOfDialogs.showChoicePath((basePath + "/").replace("//", "/"), onPathChosen, null);
+        managerOfDialogs.showChoicePath(basePath, onPathChosen, null);
     }
 }

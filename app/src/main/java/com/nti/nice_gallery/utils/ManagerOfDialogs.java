@@ -259,6 +259,7 @@ public class ManagerOfDialogs {
 
     public void showChoicePath(String defaultPath, Consumer<String> onChoice, Runnable onCancel) {
         defaultPath = defaultPath != null ? defaultPath : ManagerOfFiles.PATH_ROOT;
+        defaultPath = (defaultPath + "/").replace("//", "/");
 
         View layout = LayoutInflater.from(context).inflate(R.layout.dialog_choice_path, null);
 

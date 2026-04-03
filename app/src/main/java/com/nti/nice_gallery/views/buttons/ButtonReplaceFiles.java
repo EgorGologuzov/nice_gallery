@@ -136,6 +136,6 @@ public class ButtonReplaceFiles extends ButtonBase {
             );
         };
 
-        managerOfDialogs.showChoicePath((basePath + "/").replace("//", "/"), onPathChosen, null);
+        managerOfDialogs.showChoicePath(basePath, onPathChosen, null);
     }
 }

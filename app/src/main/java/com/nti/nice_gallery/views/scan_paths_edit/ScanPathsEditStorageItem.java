@@ -93,8 +93,7 @@ public class ScanPathsEditStorageItem extends LinearLayout {
 
             Runnable onCancel = null;
 
-            managerOfDialogs.showPrompt(
-                    R.string.dialog_title_prompt_input_path,
+            managerOfDialogs.showChoicePath(
                     storage != null ? storage.path : null,
                     onOk,
                     onCancel
