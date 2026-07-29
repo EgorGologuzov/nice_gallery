@@ -1,6 +1,5 @@
 package com.nti.nice_gallery.activities;
 
-import android.annotation.SuppressLint;
 import android.app.DatePickerDialog;
 import android.app.TimePickerDialog;
 import android.content.Intent;
@@ -15,14 +14,12 @@ import android.widget.TimePicker;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.appcompat.widget.SwitchCompat;
 
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
 import com.nti.nice_gallery.R;
 import com.nti.nice_gallery.data.Domain;
 import com.nti.nice_gallery.data.IManagerOfSettings;
-import com.nti.nice_gallery.data.ManagerOfSettings_Test1;
 import com.nti.nice_gallery.models.ModelFilters;
 import com.nti.nice_gallery.models.ModelMediaFile;
 import com.nti.nice_gallery.utils.ReadOnlyList;
@@ -34,7 +31,6 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 
 public class ActivityFilters extends AppCompatActivity {
     private ChipGroup extensions;

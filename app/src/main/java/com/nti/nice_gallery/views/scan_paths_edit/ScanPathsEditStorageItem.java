@@ -85,7 +85,23 @@ public class ScanPathsEditStorageItem extends LinearLayout {
         View.OnClickListener onButtonAddClick = btn -> {
 
             Consumer<String> onOk = path -> {
+                path = path == null ? "" : path.trim();
+
+                if (path.isEmpty() || !ANDROID_PATH_PATTERN.matcher(path).matches()) {
+                    managerOfNotifications.showToast(R.string.toast_invalid_path_value);
+                    return;
+                }
+
+                path = path.endsWith("/") ? path : path + "/";
+
+                if (storageParams != null && storageParams.paths != null && storageParams.paths.contains(path)) {
+                    managerOfNotifications.showToast(R.string.toast_path_already_added);
+                    return;
+                }
+
                 addPath(path);
+                managerOfNotifications.showToast(R.string.toast_path_successfully_added);
+
                 if (storageParamsChangeListener != null) {
                     storageParamsChangeListener.accept(this);
                 }
@@ -137,23 +153,9 @@ public class ScanPathsEditStorageItem extends LinearLayout {
     }
 
     public void addPath(String path) {
-        path = path == null ? "" : path.trim();
-
-        if (path.isEmpty() || !ANDROID_PATH_PATTERN.matcher(path).matches()) {
-            managerOfNotifications.showToast(R.string.toast_invalid_path_value);
-            return;
-        }
-
-        path = path.endsWith("/") ? path : path + "/";
-
-        if (storageParams != null && storageParams.paths != null && storageParams.paths.contains(path)) {
-            managerOfNotifications.showToast(R.string.toast_path_already_added);
-            return;
-        }
-
         ScanPathsEditPathItem pathItem = new ScanPathsEditPathItem(getContext());
 
-        Consumer<ScanPathsEditPathItem> onButtonDeleteClick = item -> {
+        Consumer<ScanPathsEditPathItem> onDeleteSubmit = item -> {
             pathsList.removeView(item);
             if (storageParamsChangeListener != null) {
                 storageParamsChangeListener.accept(this);
@@ -163,12 +165,19 @@ public class ScanPathsEditStorageItem extends LinearLayout {
             }
         };
 
+        Consumer<ScanPathsEditPathItem> onButtonDeleteClick = item -> {
+            managerOfDialogs.showYesNo(
+                    R.string.dialog_title_submit_deletion,
+                    getContext().getString(R.string.format_message_item_deletion_request, item.getPath()),
+                    () -> onDeleteSubmit.accept(item),
+                    null
+            );
+        };
+
         pathItem.setPath(path);
         pathItem.setButtonDeleteClickListener(onButtonDeleteClick);
         pathsList.removeView(infoView);
         pathsList.addView(pathItem);
-
-        managerOfNotifications.showToast(R.string.toast_path_successfully_added);
     }
 
     private void setNoItemsInfo() {

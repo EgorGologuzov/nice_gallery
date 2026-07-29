@@ -19,11 +19,10 @@ import androidx.annotation.ArrayRes;
 import androidx.annotation.StringRes;
 
 import com.nti.nice_gallery.R;
+import com.nti.nice_gallery.data.Domain;
 import com.nti.nice_gallery.data.IManagerOfFiles;
 import com.nti.nice_gallery.data.IManagerOfSettings;
 import com.nti.nice_gallery.data.ManagerOfFiles;
-import com.nti.nice_gallery.data.ManagerOfSettings;
-import com.nti.nice_gallery.data.ManagerOfSettings_Test1;
 import com.nti.nice_gallery.models.ModelFilesActionRequest;
 import com.nti.nice_gallery.models.ModelFilesActionResponse;
 import com.nti.nice_gallery.models.ModelFilters;
@@ -271,7 +270,7 @@ public class ManagerOfDialogs {
 
         final IManagerOfFiles managerOfFiles = new ManagerOfFiles(context);
         final ManagerOfThreads managerOfThreads = new ManagerOfThreads(context);
-        final IManagerOfSettings managerOfSettings = new ManagerOfSettings_Test1(context);
+        final IManagerOfSettings managerOfSettings = Domain.getManagerOfSettings(context);
 
         Consumer<LinearLayout> clearContainer = container -> {
             int childCount = container.getChildCount();

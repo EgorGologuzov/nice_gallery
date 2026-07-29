@@ -45,6 +45,7 @@
     <string name="format_message_file_type_folder">[Папка] %s;</string>
     <string name="format_message_file_type_file">[Файл] %s;</string>
     <string name="format_message_file_type_other">[] %s;</string>
+    <string name="format_message_item_deletion_request">Удалить элемент: %s</string>
     <string name="format_status_info_action_progress">Обработка: %s (%d/%d)</string>
     <string name="format_status_info_response_report">Найдено файлов: %d</string>
 
@@ -95,6 +96,7 @@
     <string name="dialog_title_choice_path">Выберите путь</string>
     <string name="dialog_title_action_report">Отчет о действии</string>
     <string name="dialog_title_duplicate_name_policy">Если имя файла занято?</string>
+    <string name="dialog_title_submit_deletion">Подтвердите удаление</string>
     <string name="dialog_button_ok">ОК</string>
     <string name="dialog_button_yes">Да</string>
     <string name="dialog_button_no">Нет</string>

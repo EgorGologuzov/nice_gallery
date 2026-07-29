@@ -21,9 +21,6 @@ public interface IManagerOfSettings {
     ModelGetFilesRequest.SortVariant getSortVariant();
     void saveSortVariant(ModelGetFilesRequest.SortVariant variant);
 
-    ModelFilesActionRequest.FilesAction getLastFilesAction();
-    void saveLastFilesAction(ModelFilesActionRequest.FilesAction action);
-
     ReadOnlyList<String> getPathsHistory();
     void savePathToHistory(String path);
 }

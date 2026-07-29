@@ -12,15 +12,23 @@ public class ReadOnlyList<T> implements Iterable<T> {
 
     private final ArrayList<T> list = new ArrayList<>();
 
+    public ReadOnlyList(T[] source) {
+        if (source != null) {
+            list.addAll(Arrays.asList(source));
+        }
+    }
+
     public ReadOnlyList(Collection<T> source) {
         if (source != null) {
             list.addAll(source);
         }
     }
 
-    public ReadOnlyList(T[] source) {
+    public ReadOnlyList(Iterable<T> source) {
         if (source != null) {
-            list.addAll(Arrays.asList(source));
+            List<T> sourceAsList = new ArrayList<>();
+            source.forEach(sourceAsList::add);
+            list.addAll(sourceAsList);
         }
     }
 

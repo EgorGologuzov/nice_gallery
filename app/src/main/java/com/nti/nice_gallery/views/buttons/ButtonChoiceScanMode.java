@@ -14,6 +14,8 @@ import java.util.stream.Collectors;
 
 public class ButtonChoiceScanMode extends ButtonBase {
 
+    private static final ModelScanParams.ScanMode scanModeDefault = ModelScanParams.ScanMode.ScanPathsInListOnly;
+
     ModelScanParams.ScanMode scanMode;
     List<ModelScanParams.ScanMode> variants;
 
@@ -37,7 +39,7 @@ public class ButtonChoiceScanMode extends ButtonBase {
     }
 
     private void init() {
-        scanMode = ModelScanParams.ScanMode.ScanAll;
+        scanMode = scanModeDefault;
         variants = Arrays.stream(ModelScanParams.ScanMode.values()).collect(Collectors.toList());
 
         managerOfDialogs = new ManagerOfDialogs(getContext());
@@ -49,7 +51,7 @@ public class ButtonChoiceScanMode extends ButtonBase {
 
     private void updateView() {
         if (scanMode == null) {
-            scanMode = ModelScanParams.ScanMode.ScanAll;
+            scanMode = scanModeDefault;
         }
 
         switch (scanMode) {
