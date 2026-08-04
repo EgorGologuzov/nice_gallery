@@ -49,7 +49,7 @@ public class ManagerOfCache {
     }
 
     public void cachePreview(ModelMediaFile fileInfo, Size targetSize, ModelGetPreviewResponse response) {
-        final int MAX_LISTS_COUNT = 100;
+        final int MAX_LISTS_COUNT = 60;
 
         if (previewsCache.size() >= MAX_LISTS_COUNT) {
             String oldestKey = previewsCache.keySet().iterator().next();

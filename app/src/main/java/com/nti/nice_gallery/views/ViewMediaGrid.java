@@ -312,10 +312,9 @@ public class ViewMediaGrid extends ScrollView {
 
         Supplier<LinearLayout> renderNextForQuiltVariant = () -> {
             final Size NO_SIZE_ITEM_RESOLUTION = new Size(960, 960);
-            final int MIN_IMAGES_ROW_WIDTH_PX = 1920;
             final int CONTAINER_HORIZONTAL_PADDING_DP = 4;
             final int ITEM_MARGIN_DP = 4;
-            final float MIN_ROW_WIDTH_TO_HEIGHT_RATIO = 1.5f;
+            final float MIN_ROW_WIDTH_TO_HEIGHT_RATIO = 1920f / 1080f;
             final int MAX_ITEMS_IN_ROW = 3;
 
             int from = renderedItemsCount;
@@ -366,7 +365,7 @@ public class ViewMediaGrid extends ScrollView {
                 float avgHeight = rowHeights.stream().reduce(0f, Float::sum) / rowHeights.size();
                 boolean isItemLast = mediaFiles.indexOf(item) == mediaFiles.size() - 1;
 
-                if ((sumWidth < MIN_IMAGES_ROW_WIDTH_PX || sumWidth / avgHeight < MIN_ROW_WIDTH_TO_HEIGHT_RATIO)
+                if (sumWidth / avgHeight < MIN_ROW_WIDTH_TO_HEIGHT_RATIO
                         && rowWidths.size() < MAX_ITEMS_IN_ROW
                         && !isItemLast
                 ) {
