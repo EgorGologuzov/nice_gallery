@@ -50,6 +50,10 @@ public class ModelMediaFile {
     @ForVideos
     @ForFolders
     public final LocalDateTime updatedAt;
+    @ForImages
+    @ForVideos
+    @ForFolders
+    public final Boolean isHidden;
 
     @ForImages
     @ForVideos
@@ -95,6 +99,7 @@ public class ModelMediaFile {
             Type type,
             LocalDateTime createdAt,
             LocalDateTime updatedAt,
+            Boolean isHidden,
             Long weight,
             Integer width,
             Integer height,
@@ -111,6 +116,7 @@ public class ModelMediaFile {
         this.type = type;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
+        this.isHidden = isHidden;
         this.weight = weight;
         this.width = width;
         this.height = height;

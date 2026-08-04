@@ -147,7 +147,9 @@ public class FragmentMediaTree extends Fragment {
         };
 
         Runnable onStatusInfoChanged = () -> {
-            textStatusInfo.setText(statusInfo);
+            if (statusInfo != null) {
+                textStatusInfo.setText(statusInfo);
+            }
         };
 
         Runnable refreshFilesList = () -> {
@@ -325,9 +327,11 @@ public class FragmentMediaTree extends Fragment {
         viewMediaGrid.setSelectedFiles(selectedFiles);
         viewMediaGrid.setSelectedMode(isSelectedMode);
 
+        onStatusInfoChanged.run();
+
         return view;
     }
-    
+
     private String tryGetString(@StringRes int resId, Object... formatArgs) {
         if (isAdded()) {
             return getString(resId, formatArgs);

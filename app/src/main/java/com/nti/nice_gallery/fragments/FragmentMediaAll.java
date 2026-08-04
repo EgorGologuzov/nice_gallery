@@ -134,7 +134,9 @@ public class FragmentMediaAll extends Fragment {
         };
 
         Runnable onStatusInfoChanged = () -> {
-            textStatusInfo.setText(statusInfo);
+            if (statusInfo != null) {
+                textStatusInfo.setText(statusInfo);
+            }
         };
 
         Supplier<String> getStatusInfo = () -> {
@@ -299,6 +301,7 @@ public class FragmentMediaAll extends Fragment {
         viewMediaGrid.setSelectedMode(isSelectedMode);
 
         refreshFilesList.run();
+        onStatusInfoChanged.run();
 
         return view;
     }

@@ -44,10 +44,10 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -67,10 +67,12 @@ public class ManagerOfFiles implements IManagerOfFiles {
     private final Context context;
 
     private final ManagerOfThreads managerOfThreads;
+    private final ManagerOfCache managerOfCache;
 
     public ManagerOfFiles(Context context) {
         this.context = context;
         this.managerOfThreads = new ManagerOfThreads(context);
+        this.managerOfCache = new ManagerOfCache(context);
     }
 
     @Override
@@ -115,7 +117,7 @@ public class ManagerOfFiles implements IManagerOfFiles {
                 }
             } catch (Exception e) {
                 error = e;
-                Log.e(LOG_TAG + 1, e.getMessage());
+                Log.e(LOG_TAG + "-260804-1", e.getMessage());
             }
 
             return new ModelStorage(
@@ -151,29 +153,6 @@ public class ManagerOfFiles implements IManagerOfFiles {
         final ModelGetFilesRequest DEFAULT_REQUEST = new ModelGetFilesRequest(null, null, null, null, null);
         final ModelGetFilesRequest requestFinal = request == null ? DEFAULT_REQUEST : request;
 
-        Function1<ModelStorage, List<ModelMediaFile>> getStorageFiles = storage -> {
-            List<ModelMediaFile> files = new ArrayList<>();
-
-            ModelScanParams.StorageParams storageParams = null;
-
-            if (requestFinal.scanParams != null && requestFinal.scanParams.storagesParams != null) {
-                storageParams = requestFinal.scanParams.storagesParams
-                        .stream()
-                        .filter(sp -> Objects.equals(sp.storageName, storage.name))
-                        .findFirst()
-                        .orElse(null);
-            }
-
-            try {
-                File storageFolder = new File(storage.path);
-                storageRecursionScanning(storageFolder, files, requestFinal.filters, storageParams);
-            } catch (Exception e) {
-                Log.e(LOG_TAG + 2, e.getMessage());
-            }
-
-            return files;
-        };
-
         Runnable returnStoragesList = () -> {
             final LocalDateTime startedAt = LocalDateTime.now();
 
@@ -204,13 +183,14 @@ public class ManagerOfFiles implements IManagerOfFiles {
                                 null,
                                 null,
                                 null,
+                                null,
                                 childElementsCount,
                                 storage.freeSpace,
                                 storage.totalSpace,
                                 null
                         ));
                     } catch (Exception e) {
-                        Log.e(LOG_TAG + 2.2, e.getMessage());
+                        Log.e(LOG_TAG + "-260804-3", e.getMessage());
                     }
                 }
 
@@ -234,65 +214,25 @@ public class ManagerOfFiles implements IManagerOfFiles {
         Runnable returnFolderFilesList = () -> {
             final LocalDateTime startedAt = LocalDateTime.now();
 
-            final List<ModelMediaFile> files = new ArrayList<>();
-            final List<ModelMediaFile> filesWithErrors = new ArrayList<>();
+            final List<File> files = new ArrayList<>();
+            scanFolder(files, new File(requestFinal.path));
+            getFilesInfoAsync(files, filesInfo -> {
+                final List<ModelMediaFile> filteredFiles = filesInfo.stream().filter(f -> filterCheck(f, requestFinal.filters))
+                        .collect(Collectors.toList());
 
-            folderScanning(new File(requestFinal.path), files, requestFinal.filters);
+                final List<ModelMediaFile> filesWithErrors = filteredFiles.stream().filter(f -> f.error != null)
+                        .collect(Collectors.toList());
 
-            for (ModelMediaFile file : files) {
-                if (file.error != null) {
-                    filesWithErrors.add(file);
-                }
-            }
-
-            final List<ModelMediaFile> sortedFiles = sortFiles(files, requestFinal.sortVariant, requestFinal.foldersFirst);
-
-            ModelGetFilesResponse getFilesResponse = new ModelGetFilesResponse(
-                    startedAt,
-                    LocalDateTime.now(),
-                    new ReadOnlyList<>(sortedFiles),
-                    new ReadOnlyList<>(new ArrayList<>()),
-                    new ReadOnlyList<>(filesWithErrors),
-                    new ReadOnlyList<>(new ArrayList<>()),
-                    requestFinal.path,
-                    null
-            );
-
-            managerOfThreads.safeAccept(callback, getFilesResponse);
-        };
-
-        Runnable scanByParams = () -> {
-            final LocalDateTime startedAt = LocalDateTime.now();
-
-            getStoragesAsync(null, getStoragesResponse -> {
-                final List<ModelMediaFile> files = new ArrayList<>();
-                final List<ModelStorage> storagesWithErrors = new ArrayList<>();
-                final List<ModelMediaFile> filesWithErrors = new ArrayList<>();
-
-                for (ModelStorage storage : getStoragesResponse.storages) {
-                    if (storage.error == null) {
-                        List<ModelMediaFile> storageFiles = getStorageFiles.invoke(storage);
-                        files.addAll(storageFiles);
-                        for (ModelMediaFile file : storageFiles) {
-                            if (file.error != null) {
-                                filesWithErrors.add(file);
-                            }
-                        }
-                    } else {
-                        storagesWithErrors.add(storage);
-                    }
-                }
-
-                final List<ModelMediaFile> sortedFiles = sortFiles(files, requestFinal.sortVariant, requestFinal.foldersFirst);
+                final List<ModelMediaFile> sortedFiles = sortFiles(filteredFiles, requestFinal.sortVariant, requestFinal.foldersFirst);
 
                 ModelGetFilesResponse getFilesResponse = new ModelGetFilesResponse(
                         startedAt,
                         LocalDateTime.now(),
                         new ReadOnlyList<>(sortedFiles),
-                        getStoragesResponse.storages,
+                        new ReadOnlyList<>(new ArrayList<>()),
                         new ReadOnlyList<>(filesWithErrors),
-                        new ReadOnlyList<>(storagesWithErrors),
-                        null,
+                        new ReadOnlyList<>(new ArrayList<>()),
+                        requestFinal.path,
                         null
                 );
 
@@ -300,7 +240,60 @@ public class ManagerOfFiles implements IManagerOfFiles {
             });
         };
 
+        Runnable scanByParams = () -> {
+            final LocalDateTime startedAt = LocalDateTime.now();
+
+            getStoragesAsync(null, getStoragesResponse -> {
+                final List<File> files = new ArrayList<>();
+                final List<ModelStorage> storagesWithErrors = new ArrayList<>();
+
+                for (ModelStorage storage : getStoragesResponse.storages) {
+                    if (storage.error == null) {
+                        ModelScanParams.StorageParams storageParams = null;
+
+                        if (requestFinal.scanParams != null && requestFinal.scanParams.storagesParams != null) {
+                            storageParams = requestFinal.scanParams.storagesParams
+                                    .stream()
+                                    .filter(sp -> Objects.equals(sp.storageName, storage.name))
+                                    .findFirst()
+                                    .orElse(null);
+                        }
+
+                        Boolean ignoreHidden = requestFinal.filters != null ? requestFinal.filters.ignoreHidden : false;
+                        scanStorage(files, new File(storage.path), storageParams, ignoreHidden);
+                    } else {
+                        storagesWithErrors.add(storage);
+                    }
+                }
+
+                getFilesInfoAsync(files, filesInfo -> {
+                    final List<ModelMediaFile> filteredFiles = filesInfo.stream().filter(f -> filterCheck(f, requestFinal.filters))
+                            .collect(Collectors.toList());
+
+                    final List<ModelMediaFile> filesWithErrors = filteredFiles.stream().filter(f -> f.error != null)
+                            .collect(Collectors.toList());
+
+                    final List<ModelMediaFile> sortedFiles = sortFiles(filteredFiles, requestFinal.sortVariant, requestFinal.foldersFirst);
+
+                    ModelGetFilesResponse getFilesResponse = new ModelGetFilesResponse(
+                            startedAt,
+                            LocalDateTime.now(),
+                            new ReadOnlyList<>(sortedFiles),
+                            getStoragesResponse.storages,
+                            new ReadOnlyList<>(filesWithErrors),
+                            new ReadOnlyList<>(storagesWithErrors),
+                            null,
+                            null
+                    );
+
+                    managerOfThreads.safeAccept(callback, getFilesResponse);
+                });
+            });
+        };
+
         Runnable scan = () -> {
+            Log.i(LOG_TAG + "-260804-4", "Start scan");
+
             final LocalDateTime startedAt = LocalDateTime.now();
 
             try {
@@ -312,7 +305,7 @@ public class ManagerOfFiles implements IManagerOfFiles {
                     returnFolderFilesList.run();
                 }
             } catch (Exception e) {
-                Log.e(LOG_TAG + 2.1, e.getMessage());
+                Log.e(LOG_TAG + "-260804-5", e.getMessage());
 
                 ModelGetFilesResponse getFilesResponse = new ModelGetFilesResponse(
                         startedAt,
@@ -327,6 +320,8 @@ public class ManagerOfFiles implements IManagerOfFiles {
 
                 managerOfThreads.safeAccept(callback, getFilesResponse);
             }
+
+            Log.i(LOG_TAG + "-260804-6", "Finish scan");
         };
 
         managerOfThreads.executeAsync(scan);
@@ -351,6 +346,12 @@ public class ManagerOfFiles implements IManagerOfFiles {
             targetPreviewResolution = new Size(requestFinal.targetWidth, request.targetHeight);
         }
         final Size targetPreviewResolutionFinal = targetPreviewResolution == null ? DEFAULT_TARGET_PREVIEW_RESOLUTION : targetPreviewResolution;
+
+        ModelGetPreviewResponse cached = managerOfCache.getPreview(request.file, targetPreviewResolutionFinal);
+        if (cached != null) {
+            managerOfThreads.safeAccept(callback, cached);
+            return;
+        }
 
         Function1<ModelMediaFile, Integer> calcInSampleSize = _item -> {
 
@@ -386,7 +387,7 @@ public class ManagerOfFiles implements IManagerOfFiles {
                 Bitmap result = BitmapFactory.decodeFile(requestFinal.file.path, options);
                 return rotateBitmap.invoke(result, _item.rotation);
             } catch (Exception e) {
-                Log.e(LOG_TAG + 3, e.getMessage());
+                Log.e(LOG_TAG + "-260804-7", e.getMessage());
                 return null;
             }
         };
@@ -400,7 +401,7 @@ public class ManagerOfFiles implements IManagerOfFiles {
                         targetPreviewResolutionFinal.getWidth(),
                         targetPreviewResolutionFinal.getHeight());
             } catch (Exception e) {
-                Log.e(LOG_TAG + 4, e.getMessage());
+                Log.e(LOG_TAG + "-260804-8", e.getMessage());
                 return null;
             }
         };
@@ -412,7 +413,7 @@ public class ManagerOfFiles implements IManagerOfFiles {
                     decoder.setTargetSize(targetPreviewResolutionFinal.getWidth(), targetPreviewResolutionFinal.getHeight());
                 });
             } catch (Exception e) {
-                Log.e(LOG_TAG, e.getMessage());
+                Log.e(LOG_TAG + "-260804-9", e.getMessage());
                 return null;
             }
         };
@@ -432,7 +433,7 @@ public class ManagerOfFiles implements IManagerOfFiles {
                     drawable = getAnimatedPreview.invoke(requestFinal.file);
                 }
             } catch (Exception e) {
-                Log.e(LOG_TAG + 4.1, e.getMessage());
+                Log.e(LOG_TAG + "-260804-10", e.getMessage());
             }
 
             ModelGetPreviewResponse response = new ModelGetPreviewResponse(
@@ -440,6 +441,7 @@ public class ManagerOfFiles implements IManagerOfFiles {
                     drawable
             );
 
+            managerOfCache.cachePreview(request.file, targetPreviewResolutionFinal, response);
             managerOfThreads.safeAccept(callback, response);
         };
 
@@ -809,7 +811,23 @@ public class ManagerOfFiles implements IManagerOfFiles {
         }
     }
 
-    private void storageRecursionScanning(File folder, List<ModelMediaFile> files, ModelFilters filters, ModelScanParams.StorageParams scanParams) {
+    // записывает в files список файлов и папок в заданной папке
+    private void scanFolder(List<File> files, File folder) {
+        if (folder == null) {
+            return;
+        }
+
+        File[] folderFiles = folder.listFiles();
+
+        if (folderFiles == null || folderFiles.length == 0) {
+            return;
+        }
+
+        files.addAll(Arrays.asList(folderFiles));
+    }
+
+    // записывает в files список файлов из всех вложенных подпапок из заданной папки, соотвествующих scanParams
+    private void scanStorage(List<File> files, File folder, ModelScanParams.StorageParams scanParams, Boolean ignoreHidden) {
 
         final int PATH_IS_NOT_TARGET = 0;
         final int PATH_IS_TARGET = 1;
@@ -864,47 +882,43 @@ public class ManagerOfFiles implements IManagerOfFiles {
         }
 
         for (File file : folderFiles) {
-            ModelMediaFile model = getFileInfo(file);
-            if (model == null) {
-                continue;
-            }
-            if (file.isDirectory()) {
-                if (foldersFilter(file, model, filters)) {
-                    storageRecursionScanning(file, files, filters, scanParams);
+            if (!(ignoreHidden == true && file.isHidden())) {
+                if (file.isDirectory()) {
+                    scanStorage(files, file, scanParams, ignoreHidden);
+                } else {
+                    files.add(file);
                 }
-            } else if (filesFilter(filters, file, model)) {
-                files.add(model);
             }
         }
     }
 
-    private void folderScanning(File folder, List<ModelMediaFile> files, ModelFilters filters) {
-        if (folder == null) {
+    private void getFilesInfoAsync(List<File> files, Consumer<List<ModelMediaFile>> callback) {
+        if (files == null || files.isEmpty()) {
+            managerOfThreads.safeAccept(callback, new ArrayList<>());
             return;
         }
 
-        File[] folderFiles = folder.listFiles();
-
-        if (folderFiles == null || folderFiles.length == 0) {
-            return;
-        }
-
-        for (File file : folderFiles) {
-            ModelMediaFile model = getFileInfo(file);
-            if (model == null) {
-                continue;
-            }
-            if (file.isDirectory()) {
-                if (foldersFilter(file, model, filters)) {
-                    files.add(model);
+        List<Supplier<ModelMediaFile>> tasks = files.stream().map(file -> {
+            return new Supplier<ModelMediaFile>() {
+                @Override
+                public ModelMediaFile get() {
+                    return getFileInfo(file);
                 }
-            } else if (filesFilter(filters, file, model)) {
-                files.add(model);
-            }
-        }
+            };
+        }).collect(Collectors.toList());
+
+        managerOfThreads.executeAsync(tasks, resultList -> {
+            List<ModelMediaFile> clearList = resultList.stream().filter(Objects::nonNull).collect(Collectors.toList());
+            managerOfThreads.safeAccept(callback, clearList);
+        });
     }
 
     private ModelMediaFile getFileInfo(File file) {
+
+        ModelMediaFile cached = managerOfCache.getFileInfo(file);
+        if (cached != null) {
+            return cached;
+        }
 
         class ImageContentInfo {
             public int width;
@@ -934,7 +948,7 @@ public class ManagerOfFiles implements IManagerOfFiles {
                 BasicFileAttributes attrs = Files.readAttributes(Paths.get(_file.getAbsolutePath()), BasicFileAttributes.class);
                 return LocalDateTime.ofInstant(Instant.ofEpochMilli(attrs.creationTime().toMillis()), ZoneId.systemDefault());
             } catch (IOException e) {
-                Log.e(LOG_TAG + 5, e.getMessage());
+                Log.e(LOG_TAG  + "-260804-11", e.getMessage());
                 return LocalDateTime.ofInstant(Instant.ofEpochMilli(_file.lastModified()), ZoneId.systemDefault());
             }
         };
@@ -961,7 +975,7 @@ public class ManagerOfFiles implements IManagerOfFiles {
             try {
                 exif = new ExifInterface(path);
             } catch (IOException e) {
-                Log.e(LOG_TAG + 6, e.getMessage());
+                Log.e(LOG_TAG + "-260804-12", e.getMessage());
                 return null;
             }
 
@@ -1015,7 +1029,7 @@ public class ManagerOfFiles implements IManagerOfFiles {
                 rotationStr = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION);
                 durationStr = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION);
             } catch (Exception e) {
-                Log.e(LOG_TAG + 7, e.getMessage());
+                Log.e(LOG_TAG + "-260804-13", e.getMessage());
                 return null;
             }
 
@@ -1062,6 +1076,7 @@ public class ManagerOfFiles implements IManagerOfFiles {
         ModelMediaFile.Type type = null;
         LocalDateTime createAt = null;
         LocalDateTime updateAt = null;
+        Boolean isHidden = null;
         Long weight = null;
         Integer width = null;
         Integer height = null;
@@ -1081,6 +1096,7 @@ public class ManagerOfFiles implements IManagerOfFiles {
             path = file.getAbsolutePath();
             createAt = getFileCreationTime.invoke(file, type);
             updateAt = Instant.ofEpochMilli(file.lastModified()).atZone(ZoneId.systemDefault()).toLocalDateTime();
+            isHidden = file.isHidden();
 
             if (type != ModelMediaFile.Type.Folder) {
                 weight = file.length();
@@ -1111,15 +1127,16 @@ public class ManagerOfFiles implements IManagerOfFiles {
             }
         } catch (Exception e) {
             error = e;
-            Log.e(LOG_TAG + 8, e.getMessage());
+            Log.e(LOG_TAG + "-260804-14", e.getMessage());
         }
 
-        return new ModelMediaFile(
+        ModelMediaFile fileInfo = new ModelMediaFile(
                 name,
                 path,
                 type,
                 createAt,
                 updateAt,
+                isHidden,
                 weight,
                 width,
                 height,
@@ -1131,60 +1148,57 @@ public class ManagerOfFiles implements IManagerOfFiles {
                 null,
                 error
         );
+
+        managerOfCache.cacheFileInfo(fileInfo);
+
+        return fileInfo;
     }
 
-    private boolean foldersFilter(File folder, ModelMediaFile model, ModelFilters filters) {
+    private boolean filterCheck(ModelMediaFile model, ModelFilters filters) {
         if (model == null) {
             return false;
         }
 
         if (filters != null) {
-            if (filters.ignoreHidden && folder.isHidden()) {
-                return false;
+            if (model.isFile) {
+                if (filters.ignoreHidden && model.isHidden) {
+                    return false;
+                }
+                if (filters.types != null && !filters.types.isEmpty() && (model.type == null || !filters.types.contains(model.type))) {
+                    return false;
+                }
+                if (filters.minWeight != null && (model.weight == null || filters.minWeight > model.weight)) {
+                    return false;
+                }
+                if (filters.maxWeight != null && (model.weight == null || filters.maxWeight < model.weight)) {
+                    return false;
+                }
+                if (filters.minCreateAt != null && (model.createdAt == null || model.createdAt.isBefore(filters.minCreateAt))) {
+                    return false;
+                }
+                if (filters.maxCreateAt != null && (model.createdAt == null || model.createdAt.isAfter(filters.maxCreateAt))) {
+                    return false;
+                }
+                if (filters.minUpdateAt != null && (model.updatedAt == null || model.updatedAt.isBefore(filters.minUpdateAt))) {
+                    return false;
+                }
+                if (filters.maxUpdateAt != null && (model.updatedAt == null || model.updatedAt.isAfter(filters.maxUpdateAt))) {
+                    return false;
+                }
+                if (filters.extensions != null && !filters.extensions.isEmpty() && (model.extension == null || !filters.extensions.contains(model.extension.toLowerCase()))) {
+                    return false;
+                }
+                if (filters.minDuration != null && (model.duration == null || filters.minDuration > model.duration)) {
+                    return false;
+                }
+                if (filters.maxDuration != null && (model.duration == null || filters.maxDuration < model.duration)) {
+                    return false;
+                }
             }
-        }
-
-        return true;
-    }
-
-    private boolean filesFilter(ModelFilters filters, File file, ModelMediaFile model) {
-        if (model == null) {
-            return false;
-        }
-
-        if (filters != null) {
-            if (filters.ignoreHidden && file.isHidden()) {
-                return false;
-            }
-            if (filters.types != null && !filters.types.isEmpty() && (model.type == null || !filters.types.contains(model.type))) {
-                return false;
-            }
-            if (filters.minWeight != null && (model.weight == null || filters.minWeight > model.weight)) {
-                return false;
-            }
-            if (filters.maxWeight != null && (model.weight == null || filters.maxWeight < model.weight)) {
-                return false;
-            }
-            if (filters.minCreateAt != null && (model.createdAt == null || model.createdAt.isBefore(filters.minCreateAt))) {
-                return false;
-            }
-            if (filters.maxCreateAt != null && (model.createdAt == null || model.createdAt.isAfter(filters.maxCreateAt))) {
-                return false;
-            }
-            if (filters.minUpdateAt != null && (model.updatedAt == null || model.updatedAt.isBefore(filters.minUpdateAt))) {
-                return false;
-            }
-            if (filters.maxUpdateAt != null && (model.updatedAt == null || model.updatedAt.isAfter(filters.maxUpdateAt))) {
-                return false;
-            }
-            if (filters.extensions != null && !filters.extensions.isEmpty() && (model.extension == null || !filters.extensions.contains(model.extension.toLowerCase()))) {
-                return false;
-            }
-            if (filters.minDuration != null && (model.duration == null || filters.minDuration > model.duration)) {
-                return false;
-            }
-            if (filters.maxDuration != null && (model.duration == null || filters.maxDuration < model.duration)) {
-                return false;
+            if (model.isFolder) {
+                if (filters.ignoreHidden && model.isHidden) {
+                    return false;
+                }
             }
         }
 
