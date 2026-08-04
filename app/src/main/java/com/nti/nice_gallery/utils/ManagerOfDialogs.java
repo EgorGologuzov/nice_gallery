@@ -13,6 +13,7 @@ import android.view.animation.AnimationUtils;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 
 import androidx.annotation.ArrayRes;
@@ -267,6 +268,7 @@ public class ManagerOfDialogs {
         LinearLayout containerHistoryPaths = layout.findViewById(R.id.containerHistoryPaths);
         ViewInfo info1 = new ViewInfo(context);
         ViewInfo info2 = new ViewInfo(context);
+        ProgressBar progressBar = layout.findViewById(R.id.progressBar);
 
         final IManagerOfFiles managerOfFiles = new ManagerOfFiles(context);
         final ManagerOfThreads managerOfThreads = new ManagerOfThreads(context);
@@ -326,10 +328,12 @@ public class ManagerOfDialogs {
                 }
 
                 if (!Objects.equals(currentPathBase, newPathBase)) {
+                    progressBar.setVisibility(View.VISIBLE);
                     currentPath = newPath;
                     loadChildPaths(() -> {
                         filterPaths();
                         renderPaths.invoke(containerChildPaths, filteredPaths, info1);
+                        progressBar.setVisibility(View.INVISIBLE);
                     });
                 } else if (!Objects.equals(currentPath, newPath)) {
                     currentPath = newPath;
@@ -433,6 +437,7 @@ public class ManagerOfDialogs {
         info2.setMessage(R.string.message_no_last_folders);
         info2.setIconVisibility(true);
         info2.setProgressBarVisibility(false);
+        progressBar.setVisibility(View.INVISIBLE);
 
         onPathChange.accept(defaultPath);
         loadPathsHistory.run();
