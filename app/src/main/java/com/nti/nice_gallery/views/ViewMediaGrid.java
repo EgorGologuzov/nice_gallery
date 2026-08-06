@@ -208,18 +208,22 @@ public class ViewMediaGrid extends ScrollView {
         if (currentWork == CurrentWork.ScanningInProgress) {
             container.removeAllViews();
             container.addView(viewInfoScanningInProgress);
+            System.gc(); // Подсказываем GC освободить память
             return;
         }
 
         if (mediaFiles == null || mediaFiles.isEmpty()) {
             container.removeAllViews();
             container.addView(viewInfoNoItems);
+            System.gc(); // Подсказываем GC освободить память
             return;
         }
 
         renderedItemsCount = 0;
 
         container.removeAllViews();
+        System.gc(); // Подсказываем GC освободить память
+
         renderNextItems();
     }
 

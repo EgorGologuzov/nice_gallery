@@ -14,12 +14,12 @@ import com.nti.nice_gallery.R;
 import com.nti.nice_gallery.fragments.FragmentMediaAll;
 import com.nti.nice_gallery.fragments.FragmentMediaTree;
 import com.nti.nice_gallery.fragments.FragmentSettings;
-import com.nti.nice_gallery.utils.ManagerOfNavigation;
 import com.nti.nice_gallery.utils.ManagerOfPermissions;
 import com.nti.nice_gallery.utils.ManagerOfThreads;
 
 import java.util.HashMap;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 import kotlin.jvm.functions.Function1;
 
@@ -77,6 +77,13 @@ public class ActivityMain extends AppCompatActivity {
             }
         }
 
+        Supplier<String> getCurrentFragmentTag = () -> {
+            if (currentFragment instanceof FragmentMediaAll) return TAG_MEDIA_ALL;
+            if (currentFragment instanceof FragmentMediaTree) return TAG_MEDIA_TREE;
+            if (currentFragment instanceof FragmentSettings) return TAG_SETTINGS;
+            return null;
+        };
+
         Runnable showCurrentFragment = () -> {
             if (currentFragment == null) {
                 return;
@@ -94,17 +101,7 @@ public class ActivityMain extends AppCompatActivity {
                 transaction.hide(fragmentSettings);
             }
 
-            String currentFragmentTag = null;
-
-            if (currentFragment == fragmentMediaAll) {
-                currentFragmentTag = TAG_MEDIA_ALL;
-            }
-            if (currentFragment == fragmentMediaTree) {
-                currentFragmentTag = TAG_MEDIA_TREE;
-            }
-            if (currentFragment == fragmentSettings) {
-                currentFragmentTag = TAG_SETTINGS;
-            }
+            String currentFragmentTag = getCurrentFragmentTag.get();
 
             if (currentFragment.isAdded()) {
                 transaction.show(currentFragment);
@@ -115,8 +112,36 @@ public class ActivityMain extends AppCompatActivity {
             transaction.commit();
         };
 
+        Runnable recreateCurrentFragment = () -> {
+            if (currentFragment == null) return;
+
+            getSupportFragmentManager().beginTransaction()
+                    .remove(currentFragment)
+                    .commit();
+
+            if (currentFragment instanceof FragmentMediaAll) {
+                fragmentMediaAll = new FragmentMediaAll();
+                currentFragment = fragmentMediaAll;
+            } else if (currentFragment instanceof FragmentMediaTree) {
+                fragmentMediaTree = new FragmentMediaTree();
+                currentFragment = fragmentMediaTree;
+            } else if (currentFragment instanceof FragmentSettings) {
+                fragmentSettings = new FragmentSettings();
+                currentFragment = fragmentSettings;
+            }
+
+            getSupportFragmentManager().beginTransaction()
+                    .add(R.id.contentFrame, currentFragment, getCurrentFragmentTag.get())
+                    .commit();
+        };
+
         Function1<MenuItem, Boolean> onSelectedFragmentChange = menuItem -> {
             int itemId = menuItem.getItemId();
+
+            if (menuSelectedItemId != null && menuSelectedItemId == itemId) {
+                recreateCurrentFragment.run();
+                return true;
+            }
 
             if (itemId == R.id.bottom_menu_button_all) {
                 if (fragmentMediaAll == null) {

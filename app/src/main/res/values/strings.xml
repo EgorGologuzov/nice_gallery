@@ -30,6 +30,10 @@
     <!--Rewind time-->
     <string name="format_rewind_time_forward">+%d</string>
     <string name="format_rewind_time_back">-%d</string>
+    <!--Info-->
+    <string name="format_info_files_cache">Кеш. файлов %s (сохранено %s)</string>
+    <string name="format_info_previews_cache">Кеш. превью %s (ОЗУ ~ %s)</string>
+    <string name="format_info_file_txt">Кол-во строк: %d\nИзменен: %s</string>
     <!--Messages-->
     <string name="format_message_action">Действие: %s</string>
     <string name="format_message_path">Путь: %s</string>
@@ -69,6 +73,10 @@
     <string name="message_no_last_folders">Нет последних путей</string>
     <string name="message_something_wrong">Что-то пошло не так</string>
     <string name="message_request_handling">Обработка запроса…</string>
+    <string name="message_cache_cleared">Данные кеша удалены</string>
+    <string name="message_file_not_exists">Файл не существует</string>
+    <!--Questions-->
+    <string name="message_question_submit_cache_clear">Вы уверенны, что хотите удалить данные кэша?</string>
     <!--Errors-->
     <string name="message_error_load_file_info_failed">Ошибка загрузки информации о файле</string>
     <string name="message_error_scanning_failed">Ошибка при сканировании</string>
@@ -97,6 +105,7 @@
     <string name="dialog_title_action_report">Отчет о действии</string>
     <string name="dialog_title_duplicate_name_policy">Если имя файла занято?</string>
     <string name="dialog_title_submit_deletion">Подтвердите удаление</string>
+    <string name="dialog_title_details">Подробности</string>
     <string name="dialog_button_ok">ОК</string>
     <string name="dialog_button_yes">Да</string>
     <string name="dialog_button_no">Нет</string>
@@ -107,6 +116,7 @@
 
 <!--Settings titles-->
     <string name="settings_title_scan_params">Параметры сканирования</string>
+    <string name="settings_title_cache_state">Состояние кэша</string>
 
 <!--Enums-->
     <string-array name="enum_grid_variants">

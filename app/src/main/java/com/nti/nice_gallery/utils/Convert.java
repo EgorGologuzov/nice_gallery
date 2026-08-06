@@ -35,7 +35,7 @@ public class Convert {
 
         double value = weight;
         if (value < BASE) {
-            return String.format(context.getResources().getString(R.string.format_weight_bytes), value);
+            return String.format(context.getResources().getString(R.string.format_weight_bytes), weight);
         }
 
         value /= BASE;

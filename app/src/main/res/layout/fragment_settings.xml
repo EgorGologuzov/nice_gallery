@@ -19,4 +19,17 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content" />
 
+    <TextView
+        style="@style/TextAppearance.AppCompat.Body2"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_title_cache_state"
+        android:layout_marginTop="16dp"
+        android:layout_marginBottom="4dp"
+        android:textAlignment="center"/>
+
+    <com.nti.nice_gallery.views.ViewCacheState
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
+
 </LinearLayout>

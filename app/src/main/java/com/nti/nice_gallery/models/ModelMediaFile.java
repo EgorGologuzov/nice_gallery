@@ -2,11 +2,12 @@ package com.nti.nice_gallery.models;
 
 import androidx.annotation.Nullable;
 
+import com.nti.nice_gallery.utils.JsonUtil;
 import com.nti.nice_gallery.utils.ReadOnlyList;
 
+import org.json.JSONObject;
+
 import java.time.LocalDateTime;
-import java.util.Date;
-import java.util.Objects;
 
 public class ModelMediaFile {
 
@@ -136,5 +137,56 @@ public class ModelMediaFile {
         isStorage = type == Type.Storage;
         isAnimatedImage = type == Type.Image && (extension != null && extension.equalsIgnoreCase("gif")
                 || extension != null && extension.equalsIgnoreCase("webp"));
+    }
+
+    public ModelMediaFile(String jsonStr) {
+        JSONObject json = JsonUtil.newJsonObject(jsonStr);
+        this.name = JsonUtil.getString(json, "name", null);
+        this.path = JsonUtil.getString(json, "path", null);
+        this.type = JsonUtil.getEnum(json, "type", Type.class, null);
+        this.createdAt = JsonUtil.getLocalDateTime(json, "createdAt", null);
+        this.updatedAt = JsonUtil.getLocalDateTime(json, "updatedAt", null);
+        this.isHidden = JsonUtil.getBoolean(json, "isHidden", null);
+        this.weight = JsonUtil.getLong(json, "weight", null);
+        this.width = JsonUtil.getInt(json, "width", null);
+        this.height = JsonUtil.getInt(json, "height", null);
+        this.rotation = JsonUtil.getInt(json, "rotation", null);
+        this.extension = JsonUtil.getString(json, "extension", null);
+        this.duration = JsonUtil.getInt(json, "duration", null);
+        this.childElementsCount = JsonUtil.getInt(json, "childElementsCount", null);
+        this.freeSpace = JsonUtil.getLong(json, "freeSpace", null);
+        this.totalSpace = JsonUtil.getLong(json, "totalSpace", null);
+        String errorMessage = JsonUtil.getString(json, "error", null);
+        this.error = errorMessage != null ? new Exception(errorMessage) : null;
+
+        isFile = type == Type.Image || type == Type.Video;
+        isDirectory = type == Type.Folder || type == Type.Storage;
+        isImage = type == Type.Image;
+        isVideo = type == Type.Video;
+        isFolder = type == Type.Folder;
+        isStorage = type == Type.Storage;
+        isAnimatedImage = type == Type.Image && (extension != null && extension.equalsIgnoreCase("gif")
+                || extension != null && extension.equalsIgnoreCase("webp"));
+    }
+
+    public String toJson() {
+        JSONObject json = JsonUtil.newJsonObject();
+        JsonUtil.addString(json, "name", name);
+        JsonUtil.addString(json, "path", path);
+        JsonUtil.addEnum(json, "type", type);
+        JsonUtil.addLocalDateTime(json, "createdAt", createdAt);
+        JsonUtil.addLocalDateTime(json, "updatedAt", updatedAt);
+        JsonUtil.addBoolean(json, "isHidden", isHidden);
+        JsonUtil.addLong(json, "weight", weight);
+        JsonUtil.addInt(json, "width", width);
+        JsonUtil.addInt(json, "height", height);
+        JsonUtil.addInt(json, "rotation", rotation);
+        JsonUtil.addString(json, "extension", extension);
+        JsonUtil.addInt(json, "duration", duration);
+        JsonUtil.addInt(json, "childElementsCount", childElementsCount);
+        JsonUtil.addLong(json, "freeSpace", freeSpace);
+        JsonUtil.addLong(json, "totalSpace", totalSpace);
+        JsonUtil.addString(json, "error", error != null ? error.getMessage() : null);
+        return json.toString();
     }
 }

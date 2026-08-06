@@ -4,7 +4,6 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.util.Log;
 
-import com.nti.nice_gallery.models.ModelFilesActionRequest;
 import com.nti.nice_gallery.models.ModelFilters;
 import com.nti.nice_gallery.models.ModelGetFilesRequest;
 import com.nti.nice_gallery.models.ModelScanParams;
@@ -12,15 +11,25 @@ import com.nti.nice_gallery.utils.JsonUtil;
 import com.nti.nice_gallery.utils.ReadOnlyList;
 import com.nti.nice_gallery.views.ViewMediaGrid;
 
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Objects;
 
 public class ManagerOfSettings implements IManagerOfSettings {
 
     private static final String LOG_TAG = "ManagerOfSettings";
     private static final String APP_PREFERENCES = "app_preferences";
 
-    private final SharedPreferences preferences;
     private final Context context;
+    private final SharedPreferences preferences;
 
     private static ModelScanParams scanParamsDefault = null;
 
@@ -136,5 +145,71 @@ public class ManagerOfSettings implements IManagerOfSettings {
         SharedPreferences.Editor editor = preferences.edit();
         editor.putString(PATHS_HISTORY_KEY, jsonStr);
         editor.apply();
+    }
+
+    @Override
+    public TxtFile readTxt(String filePath) {
+        Object[] dirAndName = parseDirAndFileNameFromFilePath(filePath);
+        File file = new File((File) dirAndName[0], (String) dirAndName[1]);
+
+        if (!file.exists()) return null;
+
+        String[] content;
+        try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
+            int linesCount = Integer.parseInt(reader.readLine());
+            content = new String[linesCount];
+
+            for (int i = 0; i < linesCount; i++) {
+                content[i] = reader.readLine();
+            }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
+        LocalDateTime updatedAt = LocalDateTime.ofEpochSecond(
+                file.lastModified() / 1000,
+                0,
+                java.time.ZoneOffset.UTC
+        );
+
+        return new TxtFile(filePath, updatedAt, content);
+    }
+
+    @Override
+    public TxtFile saveTxt(String filePath, String[] content) {
+        Object[] dirAndName = parseDirAndFileNameFromFilePath(filePath);
+        File file = new File((File) dirAndName[0], (String) dirAndName[1]);
+
+        content = content != null ? content : new String[0];
+
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(file))) {
+            writer.write(String.valueOf(content.length));
+            writer.newLine();
+
+            for (String line : content) {
+                writer.write(line);
+                writer.newLine();
+            }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
+        return new TxtFile(
+                filePath,
+                LocalDateTime.now(),
+                content
+        );
+    }
+
+    private Object[] parseDirAndFileNameFromFilePath(String filePath) {
+        String[] dirAndName = filePath.split("/");
+        String dir = dirAndName[0];
+        String fileName = dirAndName[1];
+
+        File dirAsFile = Objects.equals(dir, "data") ? context.getDataDir() :
+                Objects.equals(dir, "cache") ? context.getCacheDir() :
+                context.getDataDir();
+
+        return new Object[] { dirAsFile, fileName };
     }
 }
