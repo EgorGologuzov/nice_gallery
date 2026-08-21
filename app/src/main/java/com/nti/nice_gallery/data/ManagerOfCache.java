@@ -11,6 +11,7 @@ import com.nti.nice_gallery.R;
 import com.nti.nice_gallery.models.ModelGetPreviewResponse;
 import com.nti.nice_gallery.models.ModelMediaFile;
 import com.nti.nice_gallery.utils.Convert;
+import com.nti.nice_gallery.utils.ManagerOfThreads;
 
 import java.io.File;
 import java.time.Instant;
@@ -25,7 +26,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public class ManagerOfCache {
 
-    private static final HashMap<String, ModelMediaFile> filesInfoCache = new HashMap<>();
+    private static HashMap<String, ModelMediaFile> filesInfoCache = new HashMap<>();
     private static final Map<String, PreviewCacheList> previewsCache = new LinkedHashMap<>();
     private static final ReentrantReadWriteLock cacheLock = new ReentrantReadWriteLock();
 
@@ -35,6 +36,7 @@ public class ManagerOfCache {
 
     private final Context context;
     private IManagerOfSettings managerOfSettings;
+    private ManagerOfThreads managerOfThreads;
 
     public ManagerOfCache(Context context) {
         this.context = context;
@@ -43,6 +45,12 @@ public class ManagerOfCache {
     public void initManagerOfSettings() {
         if (managerOfSettings == null) {
             managerOfSettings = Domain.getManagerOfSettings(context);
+        }
+    }
+
+    public void initManagerOfThreads() {
+        if (managerOfThreads == null) {
+            managerOfThreads = new ManagerOfThreads(context);
         }
     }
 
@@ -83,17 +91,25 @@ public class ManagerOfCache {
 
     public void restoreFilesInfoCache() {
         initManagerOfSettings();
-        filesInfoCache.clear();
+        initManagerOfThreads();
 
-        IManagerOfSettings.TxtFile file = managerOfSettings.readTxt(IManagerOfSettings.CACHE_FILES_INFO_TXT);
-        if (file != null && file.strings != null && file.strings.length > 0) {
-            for (int i = 0; i < file.strings.length; i++) {
-                ModelMediaFile fileInfo = new ModelMediaFile(file.strings[i]);
-                filesInfoCache.put(fileInfo.path, fileInfo);
+        managerOfThreads.executeAsync(() -> {
+            HashMap<String, ModelMediaFile> cache = new HashMap<>();
+            IManagerOfSettings.TxtFile file = managerOfSettings.readTxt(IManagerOfSettings.CACHE_FILES_INFO_TXT);
+
+            if (file != null && file.strings != null && file.strings.length > 0) {
+                for (int i = 0; i < file.strings.length; i++) {
+                    ModelMediaFile fileInfo = new ModelMediaFile(file.strings[i]);
+                    cache.put(fileInfo.path, fileInfo);
+                }
             }
-        }
 
-        filesCacheTxt = file;
+            cacheLock.writeLock().lock();
+            cache.putAll(filesInfoCache);
+            filesInfoCache = cache;
+            filesCacheTxt = file;
+            cacheLock.writeLock().unlock();
+        });
     }
 
     public String getFilesCacheInfo() {

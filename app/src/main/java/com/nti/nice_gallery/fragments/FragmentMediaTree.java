@@ -109,14 +109,9 @@ public class FragmentMediaTree extends Fragment {
         }
 
         Supplier<ModelGetFilesRequest> buildRequest = () -> {
-            ModelGetFilesRequest.SortVariant sortVariant = ModelGetFilesRequest.SortVariant.ByCreateAtDesc;
             boolean foldersFirst = true;
 
-            if (request != null) {
-                sortVariant = request.sortVariant;
-                foldersFirst = request.foldersFirst;
-            }
-
+            ModelGetFilesRequest.SortVariant sortVariant = managerOfSettings.getSortVariant();
             ModelScanParams scanParams = managerOfSettings.getScanParams();
             ModelFilters filters = managerOfSettings.getFilters();
             String path = pathStack.get(pathStack.size() - 1);

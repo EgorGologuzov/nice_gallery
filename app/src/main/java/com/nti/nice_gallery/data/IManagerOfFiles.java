@@ -4,6 +4,8 @@ import com.nti.nice_gallery.models.ModelFilesActionRequest;
 import com.nti.nice_gallery.models.ModelFilesActionResponse;
 import com.nti.nice_gallery.models.ModelGetFilesRequest;
 import com.nti.nice_gallery.models.ModelGetFilesResponse;
+import com.nti.nice_gallery.models.ModelGetPathsRequest;
+import com.nti.nice_gallery.models.ModelGetPathsResponse;
 import com.nti.nice_gallery.models.ModelGetPreviewRequest;
 import com.nti.nice_gallery.models.ModelGetPreviewResponse;
 import com.nti.nice_gallery.models.ModelGetStoragesRequest;
@@ -16,5 +18,6 @@ public interface IManagerOfFiles {
     void getStoragesAsync(ModelGetStoragesRequest request, Consumer<ModelGetStoragesResponse> callback);
     void getFilesAsync(ModelGetFilesRequest request, Consumer<ModelGetFilesResponse> callback);
     void getPreviewAsync(ModelGetPreviewRequest request, Consumer<ModelGetPreviewResponse> callback);
+    void getPathsAsync(ModelGetPathsRequest request, Consumer<ModelGetPathsResponse> callback);
     void executeAction(ModelFilesActionRequest request, Consumer<ModelFilesActionResponse> callbackResult, Consumer<ModelRequestProgress> callbackProgress);
 }

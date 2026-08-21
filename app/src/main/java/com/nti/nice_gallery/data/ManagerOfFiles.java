@@ -21,6 +21,8 @@ import com.nti.nice_gallery.models.ModelFilesActionResponse;
 import com.nti.nice_gallery.models.ModelFilters;
 import com.nti.nice_gallery.models.ModelGetFilesRequest;
 import com.nti.nice_gallery.models.ModelGetFilesResponse;
+import com.nti.nice_gallery.models.ModelGetPathsRequest;
+import com.nti.nice_gallery.models.ModelGetPathsResponse;
 import com.nti.nice_gallery.models.ModelGetPreviewRequest;
 import com.nti.nice_gallery.models.ModelGetPreviewResponse;
 import com.nti.nice_gallery.models.ModelGetStoragesRequest;
@@ -446,6 +448,42 @@ public class ManagerOfFiles implements IManagerOfFiles {
         };
 
         managerOfThreads.executeAsync(loadPreview);
+    }
+
+    @Override
+    public void getPathsAsync(ModelGetPathsRequest request, Consumer<ModelGetPathsResponse> callback) {
+        managerOfThreads.executeAsync(() -> {
+            if (request.parentPath == null || request.parentPath.isEmpty() || request.parentPath == PATH_ROOT) {
+                getStoragesAsync(null, storages -> {
+                    List<String> paths = storages.storages.stream()
+                            .map(s -> s.path)
+                            .sorted()
+                            .collect(Collectors.toList());
+
+                    managerOfThreads.safeAccept(callback, new ModelGetPathsResponse(paths));
+                });
+                return;
+            }
+
+            File parent = new File(request.parentPath);
+            if (!parent.exists() || !parent.isDirectory()) {
+                managerOfThreads.safeAccept(callback, new ModelGetPathsResponse(null));
+                return;
+            }
+
+            File[] files = parent.listFiles(file -> (request.includeDirs && file.isDirectory()) || (request.includeFiles && file.isFile()));
+            if (files == null || files.length == 0) {
+                managerOfThreads.safeAccept(callback, new ModelGetPathsResponse(new ArrayList<>()));
+                return;
+            }
+
+            List<String> paths = Arrays.stream(files)
+                    .map(File::getAbsolutePath)
+                    .sorted()
+                    .collect(Collectors.toList());
+
+            managerOfThreads.safeAccept(callback, new ModelGetPathsResponse(paths));
+        });
     }
 
     @Override

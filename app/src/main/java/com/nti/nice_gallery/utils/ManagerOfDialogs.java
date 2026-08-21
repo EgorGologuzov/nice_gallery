@@ -29,6 +29,8 @@ import com.nti.nice_gallery.models.ModelFilesActionResponse;
 import com.nti.nice_gallery.models.ModelFilters;
 import com.nti.nice_gallery.models.ModelGetFilesRequest;
 import com.nti.nice_gallery.models.ModelGetFilesResponse;
+import com.nti.nice_gallery.models.ModelGetPathsRequest;
+import com.nti.nice_gallery.models.ModelGetPathsResponse;
 import com.nti.nice_gallery.models.ModelMediaFile;
 import com.nti.nice_gallery.views.ViewInfo;
 
@@ -316,14 +318,12 @@ public class ManagerOfDialogs {
 
             @Override
             public void accept(String newPath) {
-                final int DEFAULT_ANDROID_PATH_PREFIX_LENGTH = 9;
-
                 int currentPathLastSlash = currentPath != null ? currentPath.lastIndexOf('/') : -1;
                 int newPathLastSlash = newPath != null ? newPath.lastIndexOf('/') : -1;
                 String currentPathBase = currentPathLastSlash >= 0 ? currentPath.substring(0, currentPathLastSlash) : null;
                 String newPathBase = newPathLastSlash >= 0 ? newPath.substring(0, newPathLastSlash) : null;
 
-                if (newPath == null || newPath.length() <= DEFAULT_ANDROID_PATH_PREFIX_LENGTH) {
+                if (newPath == null || newPath.isEmpty()) {
                     newPath = ManagerOfFiles.PATH_ROOT;
                 }
 
@@ -343,7 +343,7 @@ public class ManagerOfDialogs {
             }
 
             private void loadChildPaths(Runnable callback) {
-                String currentLoadPath = null;
+                String currentLoadPath;
                 int currentPathLastSlash = currentPath != null ? currentPath.lastIndexOf('/') : -1;
                 String currentPathBase = currentPathLastSlash >= 0 ? currentPath.substring(0, currentPathLastSlash) : null;
 
@@ -353,32 +353,16 @@ public class ManagerOfDialogs {
                     currentLoadPath = currentPathBase;
                 }
 
-                ModelFilters filters = new ModelFilters(
-                        true,
-                        new ReadOnlyList<>(new ModelMediaFile.Type[] { ModelMediaFile.Type.Folder }),
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null
-                );
-
-                ModelGetFilesRequest request = new ModelGetFilesRequest(
+                ModelGetPathsRequest request = new ModelGetPathsRequest(
                         currentLoadPath,
-                        null,
-                        filters,
-                        ModelGetFilesRequest.SortVariant.ByName,
-                        true
+                        true,
+                        false
                 );
 
-                Consumer<ModelGetFilesResponse> onLoaded = response -> {
+                Consumer<ModelGetPathsResponse> onLoaded = response -> {
                     managerOfThreads.runOnUiThread(() -> {
-                        if (response.error == null && response.files != null && !response.files.isEmpty()) {
-                            childPaths = response.files.stream().map(f -> f.path).collect(Collectors.toList());
+                        if (response.paths != null) {
+                            childPaths = response.paths;
                         }
                         if (callback != null) {
                             callback.run();
@@ -386,7 +370,7 @@ public class ManagerOfDialogs {
                     });
                 };
 
-                managerOfFiles.getFilesAsync(request, onLoaded);
+                managerOfFiles.getPathsAsync(request, onLoaded);
             }
 
             private void filterPaths() {
