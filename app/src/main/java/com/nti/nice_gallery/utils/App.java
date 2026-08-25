@@ -5,24 +5,30 @@ import android.app.Activity;
 import android.app.Application;
 import android.os.Bundle;
 
-import com.nti.nice_gallery.data.ManagerOfCache;
+import com.nti.nice_gallery.data.ManagerOfDatabase;
 
 public class App extends Application implements Application.ActivityLifecycleCallbacks {
 
     private int startedActivities = 0;
 
-    private ManagerOfCache managerOfCache;
+    private ManagerOfDatabase managerOfDatabase;
+    private ManagerOfThreads managerOfThreads;
 
     @Override
     public void onCreate() {
         super.onCreate();
+        init();
         onAppStart();
         registerActivityLifecycleCallbacks(this);
     }
 
+    private void init() {
+        managerOfDatabase = new ManagerOfDatabase(this);
+        managerOfThreads = new ManagerOfThreads(this);
+    }
+
     private void onAppStart() {
-        managerOfCache = new ManagerOfCache(this);
-        managerOfCache.restoreFilesInfoCache();
+        managerOfThreads.executeAsync(() -> managerOfDatabase.restoreFilesInfoCache());
     }
 
     private void onAppEnterForeground() {
@@ -30,7 +36,7 @@ public class App extends Application implements Application.ActivityLifecycleCal
     }
 
     private void onAppEnterBackground() {
-        managerOfCache.storeFilesInfoCache();
+        managerOfDatabase.storeFilesInfoCache();
     }
 
     @Override

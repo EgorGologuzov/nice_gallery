@@ -11,58 +11,37 @@ import com.nti.nice_gallery.R;
 import com.nti.nice_gallery.models.ModelGetPreviewResponse;
 import com.nti.nice_gallery.models.ModelMediaFile;
 import com.nti.nice_gallery.utils.Convert;
-import com.nti.nice_gallery.utils.ManagerOfThreads;
 
 import java.io.File;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public class ManagerOfCache {
-
-    private static HashMap<String, ModelMediaFile> filesInfoCache = new HashMap<>();
     private static final Map<String, PreviewCacheList> previewsCache = new LinkedHashMap<>();
     private static final ReentrantReadWriteLock cacheLock = new ReentrantReadWriteLock();
 
     private static final long MAX_CACHE_SIZE_BYTES = 100 * 1024 * 1024;
     private static long currentPreviewCacheWeightBytes = 0;
-    private static IManagerOfSettings.TxtFile filesCacheTxt;
 
     private final Context context;
-    private IManagerOfSettings managerOfSettings;
-    private ManagerOfThreads managerOfThreads;
+    private final ManagerOfDatabase managerOfDatabase;
 
     public ManagerOfCache(Context context) {
         this.context = context;
-    }
-
-    public void initManagerOfSettings() {
-        if (managerOfSettings == null) {
-            managerOfSettings = Domain.getManagerOfSettings(context);
-        }
-    }
-
-    public void initManagerOfThreads() {
-        if (managerOfThreads == null) {
-            managerOfThreads = new ManagerOfThreads(context);
-        }
+        this.managerOfDatabase = new ManagerOfDatabase(context);
     }
 
     public void clearFilesInfoCache() {
-        cacheLock.writeLock().lock();
-        initManagerOfSettings();
-        try {
-            filesInfoCache.clear();
-            filesCacheTxt = managerOfSettings.saveTxt(IManagerOfSettings.CACHE_FILES_INFO_TXT, null);
-        } finally {
-            cacheLock.writeLock().unlock();
-        }
+        managerOfDatabase.forEachFile(file -> {
+            file.setFileInfoCache(null);
+            return false;
+        });
     }
 
     public void clearPreviewCache() {
@@ -76,45 +55,10 @@ public class ManagerOfCache {
         }
     }
 
-    public void storeFilesInfoCache() {
-        initManagerOfSettings();
-
-        ModelMediaFile[] filesInfo = filesInfoCache.values().toArray(new ModelMediaFile[0]);
-        String[] filesInfoStr = new String[filesInfo.length];
-
-        for (int i = 0; i < filesInfo.length; i++) {
-            filesInfoStr[i] = filesInfo[i].toJson();
-        }
-
-        filesCacheTxt = managerOfSettings.saveTxt(IManagerOfSettings.CACHE_FILES_INFO_TXT, filesInfoStr);
-    }
-
-    public void restoreFilesInfoCache() {
-        initManagerOfSettings();
-        initManagerOfThreads();
-
-        managerOfThreads.executeAsync(() -> {
-            HashMap<String, ModelMediaFile> cache = new HashMap<>();
-            IManagerOfSettings.TxtFile file = managerOfSettings.readTxt(IManagerOfSettings.CACHE_FILES_INFO_TXT);
-
-            if (file != null && file.strings != null && file.strings.length > 0) {
-                for (int i = 0; i < file.strings.length; i++) {
-                    ModelMediaFile fileInfo = new ModelMediaFile(file.strings[i]);
-                    cache.put(fileInfo.path, fileInfo);
-                }
-            }
-
-            cacheLock.writeLock().lock();
-            cache.putAll(filesInfoCache);
-            filesInfoCache = cache;
-            filesCacheTxt = file;
-            cacheLock.writeLock().unlock();
-        });
-    }
-
     public String getFilesCacheInfo() {
-        String cachedFilesCount = String.valueOf(filesInfoCache.size());
-        String storedFilesCount = filesCacheTxt != null && filesCacheTxt.strings != null ? String.valueOf(filesCacheTxt.strings.length) : "0";
+        String cachedFilesCount = String.valueOf(managerOfDatabase.getCachedFiles().size());
+        ManagerOfDatabase.TxtFile cacheTxt = managerOfDatabase.getCacheTxt();
+        String storedFilesCount = cacheTxt != null && cacheTxt.strings != null ? String.valueOf(cacheTxt.strings.length) : "0";
         return context.getString(R.string.format_info_files_cache, cachedFilesCount, storedFilesCount);
     }
 
@@ -124,19 +68,14 @@ public class ManagerOfCache {
         return context.getString(R.string.format_info_previews_cache, String.valueOf(previewsCache.size()), cachedWeightStr);
     }
 
-    public IManagerOfSettings.TxtFile getFilesCacheTxt() {
-        return filesCacheTxt;
+    public ManagerOfDatabase.TxtFile getFilesCacheTxt() {
+        return managerOfDatabase.getCacheTxt();
     }
 
     public void cacheFileInfo(ModelMediaFile fileInfo) {
         if (fileInfo == null) return;
-
-        cacheLock.writeLock().lock();
-        try {
-            filesInfoCache.put(fileInfo.path, fileInfo);
-        } finally {
-            cacheLock.writeLock().unlock();
-        }
+        ManagerOfDatabase.FileData data = managerOfDatabase.getOrCreateFile(fileInfo.path);
+        data.setFileInfoCache(fileInfo);
     }
 
     @Nullable
@@ -147,14 +86,9 @@ public class ManagerOfCache {
         LocalDateTime lastUpdate = Instant.ofEpochMilli(file.lastModified())
                 .atZone(ZoneId.systemDefault()).toLocalDateTime();
 
-        cacheLock.readLock().lock();
-        try {
-            ModelMediaFile cachedInfo = filesInfoCache.get(absolutPath);
-            if (cachedInfo != null && lastUpdate.isEqual(cachedInfo.updatedAt)) {
-                return cachedInfo;
-            }
-        } finally {
-            cacheLock.readLock().unlock();
+        ModelMediaFile cachedInfo = managerOfDatabase.getOrCreateFile(absolutPath).getFileInfoCache();
+        if (cachedInfo != null && lastUpdate.isEqual(cachedInfo.updatedAt)) {
+            return cachedInfo;
         }
 
         return null;

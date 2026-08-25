@@ -24,25 +24,4 @@ public interface IManagerOfSettings {
 
     ReadOnlyList<String> getPathsHistory();
     void savePathToHistory(String path);
-
-    String CACHE_FILES_INFO_TXT = "cache/files_info.txt";
-
-    TxtFile readTxt(String filePath);
-    TxtFile saveTxt(String filePath, String[] content);
-
-    class TxtFile {
-        public final String filePath;
-        public final LocalDateTime updatedAt;
-        public final String[] strings;
-
-        public TxtFile(
-                String filePath,
-                LocalDateTime updatedAt,
-                String[] strings
-        ) {
-            this.filePath = filePath;
-            this.updatedAt = updatedAt;
-            this.strings = strings;
-        }
-    }
 }

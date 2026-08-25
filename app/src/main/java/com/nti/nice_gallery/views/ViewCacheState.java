@@ -11,15 +11,13 @@ import android.widget.TextView;
 import androidx.annotation.Nullable;
 
 import com.nti.nice_gallery.R;
-import com.nti.nice_gallery.data.IManagerOfSettings;
 import com.nti.nice_gallery.data.ManagerOfCache;
+import com.nti.nice_gallery.data.ManagerOfDatabase;
 import com.nti.nice_gallery.utils.ManagerOfDialogs;
 import com.nti.nice_gallery.utils.ManagerOfNotifications;
 import com.nti.nice_gallery.views.buttons.ButtonBase;
 
-import java.lang.reflect.Array;
 import java.time.LocalDateTime;
-import java.util.Arrays;
 
 public class ViewCacheState extends LinearLayout {
 
@@ -87,7 +85,7 @@ public class ViewCacheState extends LinearLayout {
         };
 
         View.OnClickListener onClickButtonFilesCacheDetails = btn -> {
-            IManagerOfSettings.TxtFile cacheTxt = managerOfCache.getFilesCacheTxt();
+            ManagerOfDatabase.TxtFile cacheTxt = managerOfCache.getFilesCacheTxt();
 
             String details = null;
 

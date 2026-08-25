@@ -70,11 +70,13 @@ public class ManagerOfFiles implements IManagerOfFiles {
 
     private final ManagerOfThreads managerOfThreads;
     private final ManagerOfCache managerOfCache;
+    private final ManagerOfDatabase managerOfDatabase;
 
     public ManagerOfFiles(Context context) {
         this.context = context;
         this.managerOfThreads = new ManagerOfThreads(context);
         this.managerOfCache = new ManagerOfCache(context);
+        this.managerOfDatabase = new ManagerOfDatabase(context);
     }
 
     @Override
@@ -453,7 +455,7 @@ public class ManagerOfFiles implements IManagerOfFiles {
     @Override
     public void getPathsAsync(ModelGetPathsRequest request, Consumer<ModelGetPathsResponse> callback) {
         managerOfThreads.executeAsync(() -> {
-            if (request.parentPath == null || request.parentPath.isEmpty() || request.parentPath == PATH_ROOT) {
+            if (request.parentPath == null || request.parentPath.isEmpty() || request.parentPath.equals(PATH_ROOT)) {
                 getStoragesAsync(null, storages -> {
                     List<String> paths = storages.storages.stream()
                             .map(s -> s.path)
@@ -857,10 +859,11 @@ public class ManagerOfFiles implements IManagerOfFiles {
 
         File[] folderFiles = folder.listFiles();
 
-        if (folderFiles == null || folderFiles.length == 0) {
+        if (folderFiles == null) {
             return;
         }
 
+        managerOfDatabase.actualizeFiles(folder, folderFiles);
         files.addAll(Arrays.asList(folderFiles));
     }
 
@@ -893,29 +896,37 @@ public class ManagerOfFiles implements IManagerOfFiles {
             return PATH_IS_NOT_TARGET;
         };
 
+        Function1<Boolean, File[]> getFolderFilesAndActualize = onlyFolders -> {
+            File[] folderFiles = folder.listFiles();
+            if (folderFiles == null) folderFiles = new File[0];
+            managerOfDatabase.actualizeFiles(folder, folderFiles);
+            return onlyFolders ? (File[]) Arrays.stream(folderFiles).filter(File::isDirectory).toArray() : folderFiles;
+        };
+
         File[] folderFiles = null;
+        int pathStatus = -1;
 
         if (scanParams != null) {
-            int pathStatus = getPathStatus.invoke(folder.getAbsolutePath(), scanParams.paths);
+            pathStatus = getPathStatus.invoke(folder.getAbsolutePath(), scanParams.paths);
             if (scanParams.scanMode == ModelScanParams.ScanMode.ScanAll) {
-                folderFiles = folder.listFiles();
+                folderFiles = getFolderFilesAndActualize.invoke(false);
             } else if (scanParams.scanMode == ModelScanParams.ScanMode.ScanPathsInListOnly) {
                 switch (pathStatus) {
-                    case PATH_IS_TARGET_PARENT: folderFiles = folder.listFiles(f -> f.isDirectory()); break;
+                    case PATH_IS_TARGET_PARENT: folderFiles = getFolderFilesAndActualize.invoke(true); break;
                     case PATH_IS_TARGET:
-                    case PATH_IS_TARGET_CHILD: folderFiles = folder.listFiles(); break;
+                    case PATH_IS_TARGET_CHILD: folderFiles = getFolderFilesAndActualize.invoke(false); break;
                 }
             } else if (scanParams.scanMode == ModelScanParams.ScanMode.ScanPathsNotInListOnly) {
                 switch (pathStatus) {
                     case PATH_IS_NOT_TARGET:
-                    case PATH_IS_TARGET_PARENT: folderFiles = folder.listFiles(); break;
+                    case PATH_IS_TARGET_PARENT: folderFiles = getFolderFilesAndActualize.invoke(false); break;
                 }
             }
         } else {
-            folderFiles = folder.listFiles();
+            folderFiles = getFolderFilesAndActualize.invoke(false);
         }
 
-        if (folderFiles == null || folderFiles.length == 0) {
+        if (folderFiles == null) {
             return;
         }
 
