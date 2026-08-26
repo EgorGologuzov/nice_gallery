@@ -149,17 +149,17 @@ public class FragmentMediaTree extends Fragment {
 
         Runnable refreshFilesList = () -> {
             request = buildRequest.get();
-            viewMediaGrid.trySetStateScanningInProgress(true);
+            viewMediaGrid.setScanInProgress(true);
             managerOfFiles.getFilesAsync(request, response -> {
                 managerOfThreads.runOnUiThread(() -> {
                     FragmentMediaTree.this.response = response;
                     buttonScanningReport.setSource(response);
                     if (response.error == null) {
                         viewMediaGrid.setMediaFiles(response.files);
-                        viewMediaGrid.trySetStateScanningInProgress(false);
+                        viewMediaGrid.setScanInProgress(false);
                         buttonSelectAll.setAllFiles(response.files);
                     } else {
-                        viewMediaGrid.trySetStateScanningInProgress(false);
+                        viewMediaGrid.setScanInProgress(false);
                         managerOfDialogs.showInfo(R.string.dialog_title_something_wrong, R.string.message_error_scanning_failed);
                     }
                 });
@@ -242,7 +242,7 @@ public class FragmentMediaTree extends Fragment {
 
         Consumer<ViewMediaGrid> onViewMediaGridStateChangeListener = v -> {
             boolean currentIsBusy = isBusy;
-            isBusy = v.getState() != ViewMediaGrid.CurrentWork.Standby;
+            isBusy = v.getScanInProgress();
             if (currentIsBusy != isBusy) {
                 onIsBusyChanged.run();
             }

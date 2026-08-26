@@ -49,6 +49,10 @@ public class ViewInfo extends FrameLayout {
         iconView.setImageResource(resId);
     }
 
+    public String getMessage() {
+        return messageView.getText().toString();
+    }
+
     public void setMessage(@StringRes int resId) {
         messageView.setText(resId);
     }

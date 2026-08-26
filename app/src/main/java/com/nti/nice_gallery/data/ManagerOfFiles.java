@@ -345,10 +345,24 @@ public class ManagerOfFiles implements IManagerOfFiles {
             return;
         }
 
-        Size targetPreviewResolution = null;
-        if (requestFinal.targetWidth != null && requestFinal.targetWidth > 0 && requestFinal.targetHeight != null && requestFinal.targetHeight > 0){
-            targetPreviewResolution = new Size(requestFinal.targetWidth, request.targetHeight);
-        }
+        Supplier<Size> getCheckedAndMinimizedTargetSize = () -> {
+            if (requestFinal.targetWidth != null && requestFinal.targetWidth > 0 && requestFinal.targetHeight != null && requestFinal.targetHeight > 0) {
+                if (requestFinal.file.width != null && requestFinal.file.height != null) {
+                    double rw = (double) requestFinal.targetWidth;
+                    double rh = (double) requestFinal.targetHeight;
+                    double fw = (double) requestFinal.file.width;
+                    double fh = (double) requestFinal.file.height;
+                    if (rw > fw) { double k = fw / rw; rw = k * rw; rh = k * rh; }
+                    else if (rh > fh) { double k = fh / rh; rw = k * rw; rh = k * rh; }
+                    return new Size((int) rw, (int) rh);
+                } else {
+                    return new Size(requestFinal.targetWidth, requestFinal.targetHeight);
+                }
+            }
+            return null;
+        };
+
+        Size targetPreviewResolution = getCheckedAndMinimizedTargetSize.get();
         final Size targetPreviewResolutionFinal = targetPreviewResolution == null ? DEFAULT_TARGET_PREVIEW_RESOLUTION : targetPreviewResolution;
 
         ModelGetPreviewResponse cached = managerOfCache.getPreview(request.file, targetPreviewResolutionFinal);

@@ -121,8 +121,8 @@
 <!--Enums-->
     <string-array name="enum_grid_variants">
         <item>Список</item>
-        <item>Три колонки</item>
-        <item>Шесть колонок</item>
+        <item>Крупная сетка</item>
+        <item>Мелкая сетка</item>
         <item>Одеяло</item>
     </string-array>
     <string-array name="enum_sort_variants">

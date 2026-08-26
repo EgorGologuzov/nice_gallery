@@ -26,7 +26,7 @@ public class ManagerOfCache {
     private static final Map<String, PreviewCacheList> previewsCache = new LinkedHashMap<>();
     private static final ReentrantReadWriteLock cacheLock = new ReentrantReadWriteLock();
 
-    private static final long MAX_CACHE_SIZE_BYTES = 100 * 1024 * 1024;
+    private static final long MAX_CACHE_SIZE_BYTES = 500 * 1024 * 1024;
     private static long currentPreviewCacheWeightBytes = 0;
 
     private final Context context;

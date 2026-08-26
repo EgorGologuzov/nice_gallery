@@ -19,8 +19,8 @@ public class ButtonChoiceGridVariant extends ButtonBase {
 
     private static final ReadOnlyList<VariantInfo> variants = new ReadOnlyList<>(new VariantInfo[] {
             new VariantInfo(ViewMediaGrid.GridVariant.List, R.drawable.baseline_view_list_24),
-            new VariantInfo(ViewMediaGrid.GridVariant.ThreeColumns, R.drawable.baseline_view_module_24),
-            new VariantInfo(ViewMediaGrid.GridVariant.SixColumns, R.drawable.baseline_view_compact_24),
+            new VariantInfo(ViewMediaGrid.GridVariant.LargeGrid, R.drawable.baseline_view_module_24),
+            new VariantInfo(ViewMediaGrid.GridVariant.SmallGrid, R.drawable.baseline_view_compact_24),
             new VariantInfo(ViewMediaGrid.GridVariant.Quilt, R.drawable.baseline_view_quilt_24),
     });
 

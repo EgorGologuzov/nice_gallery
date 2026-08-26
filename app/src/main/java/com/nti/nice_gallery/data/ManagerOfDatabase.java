@@ -138,9 +138,25 @@ public class ManagerOfDatabase {
         for (String name : parentMap.keySet()) {
             if (!childrenSet.contains(name)) {
                 parentMap.remove(name);
-                filesRepos.remove(parentPath + "/" + name);
+                String path = parentPath + "/" + name;
+                removeDirRecursive(path, filesRepos.getOrDefault(path, null));
             }
         }
+    }
+
+    private void removeDirRecursive(String path, ConcurrentHashMap<String, FileData> children) {
+        if (children == null) return;
+
+        for (Map.Entry<String, FileData> entry : children.entrySet()) {
+            FileData data = entry.getValue();
+            if (data == null || data.fileInfoCache == null || data.fileInfoCache.isDirectory) {
+                String childPath = path + "/" + entry.getKey();
+                ConcurrentHashMap<String, FileData> childChildren = filesRepos.getOrDefault(childPath, null);
+                removeDirRecursive(childPath, childChildren);
+            }
+        }
+
+        filesRepos.remove(path);
     }
 
     private TxtFile readTxt(String filePath) {

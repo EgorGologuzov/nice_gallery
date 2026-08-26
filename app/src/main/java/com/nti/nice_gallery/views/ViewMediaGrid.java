@@ -1,19 +1,21 @@
 package com.nti.nice_gallery.views;
 
 import android.content.Context;
+import android.content.res.Configuration;
 import android.util.AttributeSet;
 import android.util.Size;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.ViewTreeObserver;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
 import com.nti.nice_gallery.R;
-import com.nti.nice_gallery.data.Domain;
-import com.nti.nice_gallery.data.IManagerOfSettings;
+import com.nti.nice_gallery.data.ManagerOfSettings;
 import com.nti.nice_gallery.models.ModelMediaFile;
 import com.nti.nice_gallery.utils.GestureListener;
 import com.nti.nice_gallery.utils.ManagerOfThreads;
@@ -26,86 +28,60 @@ import com.nti.nice_gallery.views.grid_items.GridItemSquare;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
 import java.util.function.Consumer;
-import java.util.function.Supplier;
-
-import kotlin.jvm.functions.Function1;
 
 public class ViewMediaGrid extends ScrollView {
 
     private static final String LOG_TAG = "ViewMediaGrid";
 
-    public enum GridVariant { List, ThreeColumns, SixColumns, Quilt }
-    public enum CurrentWork { ScanningInProgress, FilesLoading, Standby }
+    public enum GridVariant { List, LargeGrid, SmallGrid, Quilt }
 
     private boolean isSelectedMode = false;
     private HashMap<String, ModelMediaFile> selectedFiles;
 
-    private LinearLayout container;
-    private ViewInfo viewInfoScanningInProgress;
-    private ViewInfo viewInfoFilesLoading;
-    private ViewInfo viewInfoNoItems;
-
     private ReadOnlyList<ModelMediaFile> mediaFiles;
     private GridVariant gridVariant;
-    private int renderedItemsCount = 0;
-    private CurrentWork currentWork = CurrentWork.Standby;
+    private boolean isScanInProgress = false;
+    private ModelMediaFile previousChangedFile;
     private Consumer<ViewMediaGrid> stateChangeListener;
     private Consumer<ViewMediaGrid> selectedModeChangeListener;
     private Consumer<GridItemBase> itemClickListener;
 
-    private IManagerOfSettings managerOfSettings;
+    private ViewInfo viewInfo;
+    private RecyclerView recyclerView;
     private ManagerOfThreads managerOfThreads;
+    private ManagerOfSettings managerOfSettings;
 
-    public ViewMediaGrid(Context context) {
+
+    public ViewMediaGrid(@NonNull Context context) {
         super(context);
         init();
     }
 
-    public ViewMediaGrid(Context context, @Nullable AttributeSet attrs) {
+    public ViewMediaGrid(@NonNull Context context, @Nullable AttributeSet attrs) {
         super(context, attrs);
         init();
     }
 
-    public ViewMediaGrid(Context context, @Nullable AttributeSet attrs, int defStyleAttr) {
+    public ViewMediaGrid(@NonNull Context context, @Nullable AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
         init();
     }
 
     private void init() {
-        managerOfSettings = Domain.getManagerOfSettings(getContext());
         managerOfThreads = new ManagerOfThreads(getContext());
+        managerOfSettings = new ManagerOfSettings(getContext());
+
         gridVariant = managerOfSettings.getGridVariant();
 
         LayoutParams params = new LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         setLayoutParams(params);
-        setOnScrollChangeListener(this::onScrollChange);
 
-        container = new LinearLayout(getContext());
-        LinearLayout.LayoutParams containerParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        container.setLayoutParams(containerParams);
-        container.setOrientation(LinearLayout.VERTICAL);
         int containerPaddingPx = new Convert(getContext()).dpToPx(4);
-        container.setPadding(containerPaddingPx, 0, containerPaddingPx, 0);
-        addView(container);
-
-        viewInfoScanningInProgress = new ViewInfo(getContext());
-        viewInfoScanningInProgress.setIconVisibility(false);
-        viewInfoScanningInProgress.setMessage(R.string.message_scanning_in_progress);
-        viewInfoScanningInProgress.setProgressBarVisibility(true);
-
-        viewInfoFilesLoading = new ViewInfo(getContext());
-        viewInfoFilesLoading.setIconVisibility(false);
-        viewInfoFilesLoading.setMessage(R.string.message_loading_in_progress);
-        viewInfoFilesLoading.setProgressBarVisibility(true);
-
-        viewInfoNoItems = new ViewInfo(getContext());
-        viewInfoNoItems.setIcon(R.drawable.baseline_image_search_24);
-        viewInfoNoItems.setIconVisibility(true);
-        viewInfoNoItems.setMessage(R.string.message_no_items);
-        viewInfoNoItems.setProgressBarVisibility(false);
-
-        updateGrid();
+        setPadding(containerPaddingPx, 0, containerPaddingPx, 0);
     }
 
     public ReadOnlyList<ModelMediaFile> getMediaFiles() {
@@ -114,7 +90,7 @@ public class ViewMediaGrid extends ScrollView {
 
     public void setMediaFiles(ReadOnlyList<ModelMediaFile> mediaFiles) {
         this.mediaFiles = mediaFiles;
-        updateGrid();
+        update();
     }
 
     public GridVariant getGridVariant() {
@@ -123,38 +99,22 @@ public class ViewMediaGrid extends ScrollView {
 
     public void setGridVariant(GridVariant gridVariant) {
         this.gridVariant = gridVariant;
-        updateGrid();
+        update();
     }
 
-    public CurrentWork getState() {
-        return currentWork;
+    public boolean getScanInProgress() {
+        return this.isScanInProgress;
     }
 
-    private void setCurrentWork(CurrentWork currentWork) {
-        this.currentWork = currentWork;
+    public void setScanInProgress(boolean isScanInProgress) {
+        if (isScanInProgress == this.isScanInProgress) return;
+
+        this.isScanInProgress = isScanInProgress;
         if (stateChangeListener != null) {
             stateChangeListener.accept(this);
         }
-    }
 
-    public boolean trySetStateScanningInProgress(boolean isScanningInProgress) {
-        if (currentWork == CurrentWork.FilesLoading) {
-            return false;
-        }
-
-        if (isScanningInProgress) {
-            if (currentWork != CurrentWork.ScanningInProgress) {
-                setCurrentWork(CurrentWork.ScanningInProgress);
-                updateGrid();
-            }
-        } else {
-            if (currentWork != CurrentWork.Standby) {
-                setCurrentWork(CurrentWork.Standby);
-                updateGrid();
-            }
-        }
-
-        return true;
+        update();
     }
 
     public void setStateChangeListener(Consumer<ViewMediaGrid> listener) {
@@ -183,10 +143,7 @@ public class ViewMediaGrid extends ScrollView {
         }
 
         this.isSelectedMode = isSelectedMode;
-        recursivelyHandleAllGridItems(container, item -> {
-            item.setCheckBoxVisibility(isSelectedMode);
-            item.setIsSelected(selectedFiles != null && selectedFiles.containsKey(item.getModel().path));
-        });
+        onSelectionChanged();
 
         if (selectedModeChangeListener != null) {
             selectedModeChangeListener.accept(this);
@@ -199,157 +156,386 @@ public class ViewMediaGrid extends ScrollView {
 
     public void setSelectedFiles(HashMap<String, ModelMediaFile> selectedFiles) {
         this.selectedFiles = selectedFiles;
-        recursivelyHandleAllGridItems(container, item -> {
-            item.setIsSelected(selectedFiles.containsKey(item.getModel().path));
+        onSelectionChanged();
+    }
+
+    private void update() {
+        Runnable setNoItemsInfo = () -> {
+            if (viewInfo != null && Objects.equals(viewInfo.getMessage(), getContext().getString(R.string.message_no_items))) {
+                return;
+            }
+
+            viewInfo = null;
+            recyclerView = null;
+
+            removeAllViews();
+            ViewInfo info = new ViewInfo(getContext());
+            info.setIcon(R.drawable.baseline_image_search_24);
+            info.setIconVisibility(true);
+            info.setMessage(R.string.message_no_items);
+            info.setProgressBarVisibility(false);
+
+            viewInfo = info;
+            addView(info);
+        };
+
+        Runnable setScanInProgressInfo = () -> {
+            if (viewInfo != null && Objects.equals(viewInfo.getMessage(), getContext().getString(R.string.message_scanning_in_progress))) {
+                return;
+            }
+
+            viewInfo = null;
+            recyclerView = null;
+
+            removeAllViews();
+            ViewInfo info = new ViewInfo(getContext());
+            info.setIconVisibility(false);
+            info.setMessage(R.string.message_scanning_in_progress);
+            info.setProgressBarVisibility(true);
+
+            viewInfo = info;
+            addView(info);
+        };
+
+        Runnable setRecyclerView = () -> {
+            viewInfo = null;
+            recyclerView = new RecyclerView(getContext());
+
+            removeAllViews();
+            LayoutParams rwParams = new LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            recyclerView.setLayoutParams(rwParams);
+            recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
+
+            int orientation = getResources().getConfiguration().orientation;
+
+            if (gridVariant == GridVariant.List) {
+                if (orientation == Configuration.ORIENTATION_PORTRAIT) {
+                    recyclerView.setAdapter(new ViewMediaGrid.GridListAdapter(this));
+                    recyclerView.setItemViewCacheSize(10);
+                } else {
+                    recyclerView.setAdapter(new ViewMediaGrid.GridListAdapter(this));
+                    recyclerView.setItemViewCacheSize(5);
+                }
+            } else if (gridVariant == GridVariant.LargeGrid) {
+                if (orientation == Configuration.ORIENTATION_PORTRAIT) {
+                    recyclerView.setAdapter(new ViewMediaGrid.GridSquareAdapter(this, 3, false));
+                    recyclerView.setItemViewCacheSize(5);
+                } else {
+                    recyclerView.setAdapter(new ViewMediaGrid.GridSquareAdapter(this, 6, false));
+                    recyclerView.setItemViewCacheSize(3);
+                }
+            } else if (gridVariant == GridVariant.SmallGrid) {
+                if (orientation == Configuration.ORIENTATION_PORTRAIT) {
+                    recyclerView.setAdapter(new ViewMediaGrid.GridSquareAdapter(this, 6, true));
+                    recyclerView.setItemViewCacheSize(10);
+                } else {
+                    recyclerView.setAdapter(new ViewMediaGrid.GridSquareAdapter(this, 12, true));
+                    recyclerView.setItemViewCacheSize(5);
+                }
+            } else if (gridVariant == GridVariant.Quilt) {
+                if (orientation == Configuration.ORIENTATION_PORTRAIT) {
+                    recyclerView.setAdapter(new ViewMediaGrid.GridQuiltAdapter(this, 1920f / 1080f, 3));
+                    recyclerView.setItemViewCacheSize(8);
+                } else {
+                    recyclerView.setAdapter(new ViewMediaGrid.GridQuiltAdapter(this, 2860f / 1080f, 6));
+                    recyclerView.setItemViewCacheSize(4);
+                }
+            }
+
+            addView(recyclerView);
+        };
+
+        if (isScanInProgress) {
+            setScanInProgressInfo.run();
+        } else if (mediaFiles == null || mediaFiles.isEmpty()) {
+            setNoItemsInfo.run();
+        } else {
+            setRecyclerView.run();
+        }
+    }
+
+    private void bindItem(GridItemBase item, ModelMediaFile fileInfo) {
+        item.setModel(fileInfo);
+        item.setOnTouchListener(this::onItemGestureDetected);
+        item.setCheckBoxVisibility(isSelectedMode);
+        if (isSelectedMode) item.setIsSelected(selectedFiles != null && selectedFiles.containsKey(fileInfo.path));
+    }
+
+    private void onItemGestureDetected(GridItemBase.TouchArgs touchArgs) {
+        GridItemBase gridItem = touchArgs.item;
+
+        if (!isSelectedMode) {
+            if (touchArgs.gestureArgs.gesture == GestureListener.Gesture.Tap) {
+                managerOfThreads.safeAccept(itemClickListener, gridItem);
+            }
+            if (touchArgs.gestureArgs.gesture == GestureListener.Gesture.LongPress) {
+                setSelectedMode(true);
+                changeItemSelectState(gridItem);
+            }
+        } else {
+            if (touchArgs.gestureArgs.gesture == GestureListener.Gesture.Tap) {
+                changeItemSelectState(gridItem);
+            }
+            if (touchArgs.gestureArgs.gesture == GestureListener.Gesture.LongPress) {
+                setSelectedMode(false);
+            }
+            if (touchArgs.gestureArgs.gesture == GestureListener.Gesture.DoubleTap) {
+                changeItemSelectStateWithShift(gridItem);
+            }
+        }
+    }
+
+    private void onSelectionChanged() {
+        if (recyclerView == null) return;
+
+        ViewMediaGrid.GridAdapterBase adapter = (ViewMediaGrid.GridAdapterBase) recyclerView.getAdapter();
+        adapter.forEachGridItem(item -> {
+            item.setCheckBoxVisibility(isSelectedMode);
+            if (isSelectedMode) item.setIsSelected(selectedFiles != null && selectedFiles.containsKey(item.getModel().path));
         });
     }
 
-    private void updateGrid() {
-        if (currentWork == CurrentWork.ScanningInProgress) {
-            container.removeAllViews();
-            container.addView(viewInfoScanningInProgress);
-            System.gc(); // Подсказываем GC освободить память
-            return;
+    private void changeItemSelectState(GridItemBase gridItem) {
+        ModelMediaFile file = gridItem.getModel();
+
+        if (selectedFiles.containsKey(file.path)) {
+            selectedFiles.remove(file.path);
+            gridItem.setIsSelected(false);
+        } else {
+            selectedFiles.put(file.path, file);
+            gridItem.setIsSelected(true);
         }
 
-        if (mediaFiles == null || mediaFiles.isEmpty()) {
-            container.removeAllViews();
-            container.addView(viewInfoNoItems);
-            System.gc(); // Подсказываем GC освободить память
-            return;
-        }
-
-        renderedItemsCount = 0;
-
-        container.removeAllViews();
-        System.gc(); // Подсказываем GC освободить память
-
-        renderNextItems();
+        previousChangedFile = file;
     }
 
-    private void onScrollChange(View v, int scrollX, int scrollY, int oldScrollX, int oldScrollY) {
-        final int SCROLL_END_THRESHOLD_PX = 200;
+    private void changeItemSelectStateWithShift(GridItemBase gridItem) {
+        ModelMediaFile file = gridItem.getModel();
 
-        View lastChild = getChildAt(getChildCount() - 1);
-        int diff = (lastChild.getBottom() - (getHeight() + getScrollY()));
-        if (diff <= SCROLL_END_THRESHOLD_PX) {
-            renderNextItems();
-        }
-    }
+        if (previousChangedFile != null) {
+            int previousTouchedIndex = mediaFiles.indexOf(previousChangedFile);
+            int nowTouchedIndex = mediaFiles.indexOf(file);
+            boolean isPreviousTouchedSelected = selectedFiles.containsKey(previousChangedFile.path);
+            int step = previousTouchedIndex <= nowTouchedIndex ? 1 : -1;
 
-    private void renderNextItems() {
-        final int RENDERING_STEP_ITEMS_COUNT = 25;
-
-        if (this.currentWork == CurrentWork.FilesLoading
-                || this.currentWork == CurrentWork.ScanningInProgress
-                || this.mediaFiles == null
-                || this.mediaFiles.isEmpty()
-                || this.renderedItemsCount == this.mediaFiles.size()
-        ) {
-            return;
-        }
-
-        setCurrentWork(CurrentWork.FilesLoading);
-        container.addView(viewInfoFilesLoading);
-
-        Supplier<LinearLayout> renderNextForListVariant = () -> {
-            int from = renderedItemsCount;
-            int to = Math.min(renderedItemsCount + RENDERING_STEP_ITEMS_COUNT, mediaFiles.size());
-
-            LinearLayout pageContainer = new LinearLayout(getContext());
-            pageContainer.setLayoutParams(new LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-            pageContainer.setOrientation(LinearLayout.VERTICAL);
-
-            for (int i = from; i < to; i++) {
-                ModelMediaFile item = mediaFiles.get(i);
-                GridItemLine itemView = new GridItemLine(getContext());
-                itemView.setModel(item);
-                pageContainer.addView(itemView);
+            for (int i = previousTouchedIndex; i - nowTouchedIndex != step; i += step) {
+                ModelMediaFile iFile = mediaFiles.get(i);
+                if (isPreviousTouchedSelected) {
+                    selectedFiles.put(iFile.path, iFile);
+                } else {
+                    selectedFiles.remove(iFile.path);
+                }
             }
 
-            renderedItemsCount = to;
+            onSelectionChanged();
+        } else {
+            changeItemSelectState(gridItem);
+        }
 
-            return pageContainer;
-        };
+        previousChangedFile = file;
+    }
 
-        Function1<Integer, LinearLayout> renderNextForColumnsVariant = columnsCount -> {
-            final int HIDE_ITEM_DATA_IF_COLUMNS_COUNT_MORE_THAN = 3;
+    private static class Holder extends RecyclerView.ViewHolder {
+        public Holder(@NonNull View itemView) {
+            super(itemView);
+        }
+    }
 
-            int from = renderedItemsCount;
-            int to = Math.min(renderedItemsCount + RENDERING_STEP_ITEMS_COUNT, mediaFiles.size());
+    private static abstract class GridAdapterBase extends RecyclerView.Adapter<ViewMediaGrid.Holder> {
+        private final HashSet<ViewMediaGrid.Holder> holders = new HashSet<>();
 
-            LinearLayout pageContainer = new LinearLayout(getContext());
-            pageContainer.setLayoutParams(new LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-            pageContainer.setOrientation(LinearLayout.VERTICAL);
+        @Override
+        public void onViewRecycled(@NonNull ViewMediaGrid.Holder holder) {
+            super.onViewRecycled(holder);
+            holders.remove(holder);
+        }
 
-            int itemsCount = 0;
-            LinearLayout row = null;
+        protected void regHolder(ViewMediaGrid.Holder holder) {
+            holders.add(holder);
+        }
 
-            for (int i = from; i < to || (row != null && i < mediaFiles.size()); i++) {
-                if (row == null) {
-                    row = new LinearLayout(getContext());
-                    row.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-                    row.setOrientation(LinearLayout.HORIZONTAL);
+        public void forEachGridItem(Consumer<GridItemBase> gridItem) {
+            for (ViewMediaGrid.Holder holder : holders) {
+                View itemView = holder.itemView;
+                if (itemView instanceof GridItemBase) {
+                    gridItem.accept((GridItemBase) itemView);
+                } else if (itemView instanceof LinearLayout) {
+                    LinearLayout row = (LinearLayout) itemView;
+                    int childCount = row.getChildCount();
+                    for (int i = 0; i < childCount; i++) {
+                        gridItem.accept((GridItemBase) row.getChildAt(i));
+                    }
                 }
+            }
+        }
+    }
 
-                ModelMediaFile item = mediaFiles.get(i);
-                GridItemSquare itemView = new GridItemSquare(getContext());
-                itemView.setIsInfoHidden(columnsCount > HIDE_ITEM_DATA_IF_COLUMNS_COUNT_MORE_THAN);
-                itemView.setModel(item);
-                row.addView(itemView);
-                itemsCount++;
+    private static class GridListAdapter extends ViewMediaGrid.GridAdapterBase {
 
-                if (row.getChildCount() == columnsCount) {
-                    pageContainer.addView(row);
+        private final ViewMediaGrid parentGrid;
+
+        public GridListAdapter(ViewMediaGrid parentGrid) {
+            this.parentGrid = parentGrid;
+        }
+
+        @NonNull
+        @Override
+        public ViewMediaGrid.Holder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+            GridItemLine item = new GridItemLine(parent.getContext());
+            return new ViewMediaGrid.Holder(item);
+        }
+
+        @Override
+        public void onBindViewHolder(@NonNull ViewMediaGrid.Holder holder, int position) {
+            regHolder(holder);
+            GridItemLine item = (GridItemLine) holder.itemView;
+            parentGrid.bindItem(item, parentGrid.getMediaFiles().get(position));
+        }
+
+        @Override
+        public int getItemCount() {
+            return parentGrid.getMediaFiles().size();
+        }
+    }
+
+    private static class GridSquareAdapter extends ViewMediaGrid.GridAdapterBase {
+
+        private final int columnsCount;
+        private final boolean hideItemData;
+
+        private final ViewMediaGrid parentGrid;
+        private List<List<ModelMediaFile>> rows;
+
+        public GridSquareAdapter(ViewMediaGrid parentGrid, int columnsCount, boolean hideItemData) {
+            this.parentGrid = parentGrid;
+            this.columnsCount = columnsCount;
+            this.hideItemData = hideItemData;
+            splitFilesByRows();
+        }
+
+        @NonNull
+        @Override
+        public ViewMediaGrid.Holder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+            LinearLayout row = new LinearLayout(parentGrid.getContext());
+            row.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            return new ViewMediaGrid.Holder(row);
+        }
+
+        @Override
+        public void onBindViewHolder(@NonNull ViewMediaGrid.Holder holder, int position) {
+            regHolder(holder);
+            List<ModelMediaFile> row = rows.get(position);
+            LinearLayout rowView = (LinearLayout) holder.itemView;
+            rowView.removeAllViews();
+
+            for (ModelMediaFile file : row) {
+                GridItemSquare item = new GridItemSquare(parentGrid.getContext());
+                item.setIsInfoHidden(hideItemData);
+                parentGrid.bindItem(item, file);
+                rowView.addView(item);
+            }
+        }
+
+        @Override
+        public int getItemCount() {
+            return rows.size();
+        }
+
+        private void splitFilesByRows() {
+            rows = new ArrayList<>();
+            List<ModelMediaFile> row = null;
+
+            for (ModelMediaFile file : parentGrid.getMediaFiles()) {
+                if (row == null) row = new ArrayList<>();
+                if (row.size() < columnsCount) row.add(file);
+                if (row.size() == columnsCount) {
+                    rows.add(row);
                     row = null;
                 }
             }
 
             if (row != null) {
-                pageContainer.addView(row);
+                rows.add(row);
             }
+        }
+    }
 
-            this.renderedItemsCount += itemsCount;
+    private static class GridQuiltAdapter extends ViewMediaGrid.GridAdapterBase {
 
-            return pageContainer;
-        };
+        final Size NO_SIZE_ITEM_RESOLUTION = new Size(960, 960);
+        final int CONTAINER_HORIZONTAL_PADDING_DP = 4;
+        final int ITEM_MARGIN_DP = 4;
+        final float minRowWidthToHeightRatio;
+        final int maxItemsInRow;
 
-        Supplier<LinearLayout> renderNextForQuiltVariant = () -> {
-            final Size NO_SIZE_ITEM_RESOLUTION = new Size(960, 960);
-            final int CONTAINER_HORIZONTAL_PADDING_DP = 4;
-            final int ITEM_MARGIN_DP = 4;
-            final float MIN_ROW_WIDTH_TO_HEIGHT_RATIO = 1920f / 1080f;
-            final int MAX_ITEMS_IN_ROW = 3;
+        private final ViewMediaGrid parentGrid;
+        private final Convert convert;
+        private List<List<ModelMediaFile>> rows;
+        private List<List<Float>> rowsWidths;
+        private List<List<Float>> rowsHeights;
 
-            int from = renderedItemsCount;
-            int to = Math.min(renderedItemsCount + RENDERING_STEP_ITEMS_COUNT, mediaFiles.size());
+        public GridQuiltAdapter(ViewMediaGrid parentGrid, float minRowWidthToHeightRatio, int maxItemsInRow) {
+            this.parentGrid = parentGrid;
+            this.minRowWidthToHeightRatio = minRowWidthToHeightRatio;
+            this.maxItemsInRow = maxItemsInRow;
+            this.convert = new Convert(parentGrid.getContext());
+            splitFilesByRows();
+        }
 
-            LinearLayout pageContainer = new LinearLayout(getContext());
-            pageContainer.setLayoutParams(new LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-            pageContainer.setOrientation(LinearLayout.VERTICAL);
+        @NonNull
+        @Override
+        public ViewMediaGrid.Holder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+            LinearLayout row = new LinearLayout(parent.getContext());
+            row.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            return new ViewMediaGrid.Holder(row);
+        }
 
-            int displayWidth = getResources().getDisplayMetrics().widthPixels;
-            Convert convert = new Convert(getContext());
-            LinearLayout rowLayout = null;
-            ArrayList<ModelMediaFile> rowItems = null;
+        @Override
+        public void onBindViewHolder(@NonNull ViewMediaGrid.Holder holder, int position) {
+            regHolder(holder);
+            List<ModelMediaFile> row = rows.get(position);
+            List<Float> widths = rowsWidths.get(position);
+            List<Float> heights = rowsHeights.get(position);
+            LinearLayout rowView = (LinearLayout) holder.itemView;
+            rowView.removeAllViews();
+
+            for (int i = 0; i < row.size(); i++) {
+                ModelMediaFile file = row.get(i);
+                Float width = widths.get(i);
+                Float height = heights.get(i);
+                GridItemQuilt item = new GridItemQuilt(parentGrid.getContext(), width, height);
+                parentGrid.bindItem(item, file);
+                rowView.addView(item);
+            }
+        }
+
+        @Override
+        public int getItemCount() {
+            return rows.size();
+        }
+
+        private void splitFilesByRows() {
+            rows = new ArrayList<>();
+            rowsWidths = new ArrayList<>();
+            rowsHeights = new ArrayList<>();
+
+            List<ModelMediaFile> row = null;
             ArrayList<Float> rowWidths = null;
             ArrayList<Float> rowHeights = null;
-            int itemsCount = 0;
+            ReadOnlyList<ModelMediaFile> mediaFiles = parentGrid.getMediaFiles();
+            int displayWidth = parentGrid.getResources().getDisplayMetrics().widthPixels;
 
-            for (int j = from; j < to || (rowLayout != null && j < mediaFiles.size()); j++) {
-                if (rowLayout == null) {
-                    rowLayout = new LinearLayout(getContext());
-                    rowLayout.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-                    rowLayout.setOrientation(LinearLayout.HORIZONTAL);
-                    rowItems = new ArrayList<>();
+            for (int j = 0; j < mediaFiles.size(); j++) {
+                if (row == null) {
+                    row = new ArrayList<>();
                     rowWidths = new ArrayList<>();
                     rowHeights = new ArrayList<>();
                 }
 
                 ModelMediaFile item = mediaFiles.get(j);
-
-                rowItems.add(item);
-                itemsCount++;
+                row.add(item);
 
                 int itemWidth, itemHeight;
 
@@ -361,16 +547,16 @@ public class ViewMediaGrid extends ScrollView {
                     itemHeight = NO_SIZE_ITEM_RESOLUTION.getHeight();
                 }
 
-                rowWidths.add((float)itemWidth);
-                rowHeights.add((float)itemHeight);
+                rowWidths.add((float) itemWidth);
+                rowHeights.add((float) itemHeight);
 
                 float sumWidth = rowWidths.stream().reduce(0f, Float::sum);
                 float maxHeight = rowHeights.stream().max(Float::compareTo).get();
                 float avgHeight = rowHeights.stream().reduce(0f, Float::sum) / rowHeights.size();
-                boolean isItemLast = mediaFiles.indexOf(item) == mediaFiles.size() - 1;
+                boolean isItemLast = j == mediaFiles.size() - 1;
 
-                if (sumWidth / avgHeight < MIN_ROW_WIDTH_TO_HEIGHT_RATIO
-                        && rowWidths.size() < MAX_ITEMS_IN_ROW
+                if (sumWidth / avgHeight < minRowWidthToHeightRatio
+                        && rowWidths.size() < maxItemsInRow
                         && !isItemLast
                 ) {
                     continue;
@@ -385,7 +571,7 @@ public class ViewMediaGrid extends ScrollView {
                     rowHeights.set(i, h2);
                 }
 
-                int displayWidthWithoutPaddings = displayWidth - convert.dpToPx(2 * CONTAINER_HORIZONTAL_PADDING_DP + 2 * rowItems.size() * ITEM_MARGIN_DP);
+                int displayWidthWithoutPaddings = displayWidth - convert.dpToPx(2 * CONTAINER_HORIZONTAL_PADDING_DP + 2 * row.size() * ITEM_MARGIN_DP);
                 sumWidth = rowWidths.stream().reduce(0f, Float::sum);
                 int itemMarginsPx = convert.dpToPx(2 * ITEM_MARGIN_DP);
 
@@ -398,154 +584,13 @@ public class ViewMediaGrid extends ScrollView {
                     rowHeights.set(i, h2);
                 }
 
-                for (int i = 0; i < rowWidths.size(); i++) {
-                    GridItemQuilt itemView = new GridItemQuilt(getContext(), rowWidths.get(i), rowHeights.get(i));
-                    itemView.setModel(rowItems.get(i));
-                    rowLayout.addView(itemView);
-                }
+                rows.add(row);
+                rowsWidths.add(rowWidths);
+                rowsHeights.add(rowHeights);
 
-                pageContainer.addView(rowLayout);
-
-                rowLayout = null;
-                rowItems = null;
+                row = null;
                 rowWidths = null;
                 rowHeights = null;
-            }
-
-            this.renderedItemsCount += itemsCount;
-
-            return pageContainer;
-        };
-
-        Runnable checkIsContainerFullAndLoadNextIfNot = () -> {
-            getViewTreeObserver().addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
-                @Override
-                public void onGlobalLayout() {
-                    getViewTreeObserver().removeOnGlobalLayoutListener(this);
-                    if (!canScrollVertically(1)) {
-                        renderNextItems();
-                    }
-                }
-            });
-        };
-
-        Consumer<GridItemBase.TouchArgs> onItemGestureDetected = new Consumer<GridItemBase.TouchArgs>() {
-            ModelMediaFile previousChangedFile;
-            @Override
-            public void accept(GridItemBase.TouchArgs touchArgs) {
-                GridItemBase gridItem = touchArgs.item;
-
-                if (!isSelectedMode) {
-                    if (touchArgs.gestureArgs.gesture == GestureListener.Gesture.Tap) {
-                        managerOfThreads.safeAccept(itemClickListener, gridItem);
-                    }
-                    if (touchArgs.gestureArgs.gesture == GestureListener.Gesture.LongPress) {
-                        setSelectedMode(true);
-                        changeItemSelectState(gridItem);
-                    }
-                } else {
-                    if (touchArgs.gestureArgs.gesture == GestureListener.Gesture.Tap) {
-                        changeItemSelectState(gridItem);
-                    }
-                    if (touchArgs.gestureArgs.gesture == GestureListener.Gesture.LongPress) {
-                        setSelectedMode(false);
-                    }
-                    if (touchArgs.gestureArgs.gesture == GestureListener.Gesture.DoubleTap) {
-                        changeItemSelectStateWithShift(gridItem);
-                    }
-                }
-            }
-
-            private void changeItemSelectState(GridItemBase gridItem) {
-                ModelMediaFile file = gridItem.getModel();
-
-                if (selectedFiles.containsKey(file.path)) {
-                    selectedFiles.remove(file.path);
-                    gridItem.setIsSelected(false);
-                } else {
-                    selectedFiles.put(file.path, file);
-                    gridItem.setIsSelected(true);
-                }
-
-                previousChangedFile = file;
-            }
-
-            private void changeItemSelectStateWithShift(GridItemBase gridItem) {
-                ModelMediaFile file = gridItem.getModel();
-
-                if (previousChangedFile != null) {
-                    int previousTouchedIndex = mediaFiles.indexOf(previousChangedFile);
-                    int nowTouchedIndex = mediaFiles.indexOf(file);
-                    boolean isPreviousTouchedSelected = selectedFiles.containsKey(previousChangedFile.path);
-                    int step = previousTouchedIndex <= nowTouchedIndex ? 1 : -1;
-
-                    for (int i = previousTouchedIndex; i - nowTouchedIndex != step; i += step) {
-                        ModelMediaFile iFile = mediaFiles.get(i);
-                        if (isPreviousTouchedSelected) {
-                            selectedFiles.put(iFile.path, iFile);
-                        } else {
-                            selectedFiles.remove(iFile.path);
-                        }
-                    }
-
-                    recursivelyHandleAllGridItems(container, item -> {
-                        item.setIsSelected(selectedFiles.containsKey(item.getModel().path));
-                    });
-                } else {
-                    changeItemSelectState(gridItem);
-                }
-
-                previousChangedFile = file;
-            }
-        };
-
-        Consumer<GridItemBase> itemPostRenderHandler = item -> {
-            item.setOnTouchListener(onItemGestureDetected);
-            item.setCheckBoxVisibility(isSelectedMode);
-            item.setIsSelected(selectedFiles != null && selectedFiles.containsKey(item.getModel().path));
-        };
-
-        Runnable renderOnePage = () -> {
-            managerOfThreads.executeAsync(() -> {
-                LinearLayout pageContainer = null;
-
-                switch (gridVariant) {
-                    case List: pageContainer = renderNextForListVariant.get(); break;
-                    case ThreeColumns: pageContainer = renderNextForColumnsVariant.invoke(3); break;
-                    case SixColumns: pageContainer = renderNextForColumnsVariant.invoke(6); break;
-                    case Quilt: pageContainer = renderNextForQuiltVariant.get(); break;
-                }
-
-                final LinearLayout pageContainerFinal = pageContainer;
-
-                managerOfThreads.runOnUiThread(() -> {
-                    recursivelyHandleAllGridItems(pageContainerFinal, itemPostRenderHandler);
-                    container.removeView(viewInfoFilesLoading);
-                    container.addView(pageContainerFinal);
-                    setCurrentWork(CurrentWork.Standby);
-                    checkIsContainerFullAndLoadNextIfNot.run();
-                });
-            });
-        };
-
-        renderOnePage.run();
-    }
-
-    private void recursivelyHandleAllGridItems(ViewGroup root, Consumer<GridItemBase> handler) {
-        if (root == null || handler == null) return;
-
-        int childCount = root.getChildCount();
-
-        for (int i = 0; i < childCount; i++) {
-            View child = root.getChildAt(i);
-
-            if (child instanceof GridItemBase) {
-                GridItemBase item = (GridItemBase) child;
-                handler.accept(item);
-            }
-
-            if (child instanceof ViewGroup) {
-                recursivelyHandleAllGridItems((ViewGroup) child, handler);
             }
         }
     }
