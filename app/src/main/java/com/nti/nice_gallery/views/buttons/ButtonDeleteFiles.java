@@ -8,7 +8,7 @@ import com.nti.nice_gallery.data.ManagerOfFiles;
 import com.nti.nice_gallery.models.ModelFilesActionRequest;
 import com.nti.nice_gallery.models.ModelFilesActionResponse;
 import com.nti.nice_gallery.models.ModelMediaFile;
-import com.nti.nice_gallery.models.ModelRequestProgress;
+import com.nti.nice_gallery.models.ModelProgress;
 import com.nti.nice_gallery.utils.ManagerOfDialogs;
 import com.nti.nice_gallery.utils.ManagerOfNotifications;
 import com.nti.nice_gallery.utils.ManagerOfThreads;
@@ -23,7 +23,7 @@ public class ButtonDeleteFiles extends ButtonBase {
     private Consumer<ButtonDeleteFiles> actionFinishedListener;
     private Consumer<ButtonDeleteFiles> actionProgressListener;
     private ModelFilesActionRequest request;
-    private ModelRequestProgress progress;
+    private ModelProgress progress;
 
     private ManagerOfDialogs managerOfDialogs;
     private ManagerOfNotifications managerOfNotifications;
@@ -58,7 +58,7 @@ public class ButtonDeleteFiles extends ButtonBase {
         this.files = files;
     }
 
-    public ModelRequestProgress getProgress() {
+    public ModelProgress getProgress() {
         return progress;
     }
 
@@ -85,7 +85,7 @@ public class ButtonDeleteFiles extends ButtonBase {
             });
         };
 
-        Consumer<ModelRequestProgress> onProgress = progress -> {
+        Consumer<ModelProgress> onProgress = progress -> {
             this.progress = progress;
             if (actionProgressListener != null) {
                 actionProgressListener.accept(this);

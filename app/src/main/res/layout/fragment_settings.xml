@@ -32,4 +32,17 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content" />
 
+    <TextView
+        style="@style/TextAppearance.AppCompat.Body2"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_title_for_developer"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="4dp"
+        android:textAlignment="center"/>
+
+    <com.nti.nice_gallery.views.ViewForDeveloper
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
+
 </LinearLayout>

@@ -174,7 +174,7 @@ public class ActivityMain extends AppCompatActivity {
             return false;
         };
 
-        Runnable onManageExternalStoragePermissionGranted = () -> {
+        Runnable showFirstFragment = () -> {
             if (currentFragment != null) {
                 showCurrentFragment.run();
             } else {
@@ -182,12 +182,16 @@ public class ActivityMain extends AppCompatActivity {
             }
         };
 
-        Runnable onManageExternalStoragePermissionDenied = () -> {
+        Runnable killApp = () -> {
             finishAndRemoveTask();
         };
 
-        Runnable requestManageExternalStoragePermission = () -> {
-            managerOfPermissions.requestExternalStorageManagerPermission(onManageExternalStoragePermissionGranted, onManageExternalStoragePermissionDenied);
+        Runnable requestPermissions = () -> {
+            managerOfPermissions.requestExternalStorageManagerPermission(() -> {
+                managerOfPermissions.requestPostNotificationsPermission(() -> {
+                    showFirstFragment.run();
+                }, killApp);
+            }, killApp);
         };
 
         OnBackPressedCallback callback = new OnBackPressedCallback(true) {
@@ -201,7 +205,7 @@ public class ActivityMain extends AppCompatActivity {
         bottomNavigationView.setOnItemSelectedListener(onSelectedFragmentChange::invoke);
         getOnBackPressedDispatcher().addCallback(this, callback);
 
-        requestManageExternalStoragePermission.run();
+        requestPermissions.run();
     }
 
     public void setBackButtonPressedListener(Fragment sender, Consumer<ActivityMain> listener) {

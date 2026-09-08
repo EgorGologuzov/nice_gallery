@@ -10,7 +10,7 @@ import com.nti.nice_gallery.models.ModelGetPreviewRequest;
 import com.nti.nice_gallery.models.ModelGetPreviewResponse;
 import com.nti.nice_gallery.models.ModelGetStoragesRequest;
 import com.nti.nice_gallery.models.ModelGetStoragesResponse;
-import com.nti.nice_gallery.models.ModelRequestProgress;
+import com.nti.nice_gallery.models.ModelProgress;
 
 import java.util.function.Consumer;
 
@@ -19,5 +19,5 @@ public interface IManagerOfFiles {
     void getFilesAsync(ModelGetFilesRequest request, Consumer<ModelGetFilesResponse> callback);
     void getPreviewAsync(ModelGetPreviewRequest request, Consumer<ModelGetPreviewResponse> callback);
     void getPathsAsync(ModelGetPathsRequest request, Consumer<ModelGetPathsResponse> callback);
-    void executeAction(ModelFilesActionRequest request, Consumer<ModelFilesActionResponse> callbackResult, Consumer<ModelRequestProgress> callbackProgress);
+    void executeAction(ModelFilesActionRequest request, Consumer<ModelFilesActionResponse> callbackResult, Consumer<ModelProgress> callbackProgress);
 }

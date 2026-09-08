@@ -52,6 +52,7 @@
     <string name="format_message_item_deletion_request">Удалить элемент: %s</string>
     <string name="format_status_info_action_progress">Обработка: %s (%d/%d)</string>
     <string name="format_status_info_response_report">Найдено файлов: %d</string>
+    <string name="format_background_operation_status">Фоновая операция (еще %d в очереди)</string>
 
 <!--Symbols-->
     <string name="symbol_dot_separator">" • "</string>
@@ -75,6 +76,7 @@
     <string name="message_request_handling">Обработка запроса…</string>
     <string name="message_cache_cleared">Данные кеша удалены</string>
     <string name="message_file_not_exists">Файл не существует</string>
+    <string name="message_starting_operation">Операция запускается</string>
     <!--Questions-->
     <string name="message_question_submit_cache_clear">Вы уверенны, что хотите удалить данные кэша?</string>
     <!--Errors-->
@@ -111,12 +113,19 @@
     <string name="dialog_button_no">Нет</string>
     <string name="dialog_button_cancel">Отмена</string>
 
+<!--Notifications-->
+    <string name="notif_title_task_finished">Операция завершена</string>
+    <string name="notif_title_prepare">Подготовка…</string>
+    <string name="notif_title_background_operation">Фоновая операция</string>
+    <string name="notif_button_cancel">Отмена</string>
+
 <!--Titles-->
     <string name="title_history_paths">Последние:</string>
 
 <!--Settings titles-->
     <string name="settings_title_scan_params">Параметры сканирования</string>
     <string name="settings_title_cache_state">Состояние кэша</string>
+    <string name="settings_title_for_developer">Для разработчика</string>
 
 <!--Enums-->
     <string-array name="enum_grid_variants">

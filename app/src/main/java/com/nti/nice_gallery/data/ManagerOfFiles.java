@@ -28,7 +28,7 @@ import com.nti.nice_gallery.models.ModelGetPreviewResponse;
 import com.nti.nice_gallery.models.ModelGetStoragesRequest;
 import com.nti.nice_gallery.models.ModelGetStoragesResponse;
 import com.nti.nice_gallery.models.ModelMediaFile;
-import com.nti.nice_gallery.models.ModelRequestProgress;
+import com.nti.nice_gallery.models.ModelProgress;
 import com.nti.nice_gallery.models.ModelScanParams;
 import com.nti.nice_gallery.models.ModelStorage;
 import com.nti.nice_gallery.utils.ManagerOfThreads;
@@ -503,7 +503,7 @@ public class ManagerOfFiles implements IManagerOfFiles {
     }
 
     @Override
-    public void executeAction(ModelFilesActionRequest request, Consumer<ModelFilesActionResponse> callbackResult, Consumer<ModelRequestProgress> callbackProgress) {
+    public void executeAction(ModelFilesActionRequest request, Consumer<ModelFilesActionResponse> callbackResult, Consumer<ModelProgress> callbackProgress) {
         List<ModelFilesActionResponse.FileInfo> actionFiles = new ArrayList<>();
         List<ModelFilesActionResponse.FileInfo> success = new ArrayList<>();
         List<ModelFilesActionResponse.FileInfo> skipped = new ArrayList<>();
@@ -600,7 +600,7 @@ public class ManagerOfFiles implements IManagerOfFiles {
                 ModelFilesActionResponse.FileInfo fileInfo = actionFiles.get(i);
                 File source = new File(fileInfo.path);
 
-                managerOfThreads.safeAccept(callbackProgress, new ModelRequestProgress(i + 1, totalFiles, fileInfo.name));
+                managerOfThreads.safeAccept(callbackProgress, new ModelProgress(i + 1, totalFiles, fileInfo.name));
 
                 if (source.delete()) {
                     success.add(fileInfo);
@@ -632,7 +632,7 @@ public class ManagerOfFiles implements IManagerOfFiles {
                 File dest = new File(newFilePaths.get(fileInfo));
                 boolean destExists = dest.exists();
 
-                managerOfThreads.safeAccept(callbackProgress, new ModelRequestProgress(i + 1, totalFiles, fileInfo.name));
+                managerOfThreads.safeAccept(callbackProgress, new ModelProgress(i + 1, totalFiles, fileInfo.name));
 
                 if (destExists && request.duplicateNamePolicy == ModelFilesActionRequest.DuplicateNamePolicy.Skip
                         || Objects.equals(source.getAbsolutePath(), dest.getAbsolutePath())
@@ -671,7 +671,7 @@ public class ManagerOfFiles implements IManagerOfFiles {
                                 fails.add(new ModelFilesActionResponse.Fail(fileInfo2, new Exception("Fail delete file")));
                             }
 
-                            managerOfThreads.safeAccept(callbackProgress, new ModelRequestProgress(j + 1, totalFilesToDelete, fileInfo2.name));
+                            managerOfThreads.safeAccept(callbackProgress, new ModelProgress(j + 1, totalFilesToDelete, fileInfo2.name));
                         }
                     }
                     if (dest.exists() || dest.mkdirs()) {
@@ -704,7 +704,7 @@ public class ManagerOfFiles implements IManagerOfFiles {
                 ModelFilesActionResponse.FileInfo fileInfo = success.get(i);
                 File source = new File(fileInfo.path);
 
-                managerOfThreads.safeAccept(callbackProgress, new ModelRequestProgress(i + 1, totalFilesToDelete, fileInfo.name));
+                managerOfThreads.safeAccept(callbackProgress, new ModelProgress(i + 1, totalFilesToDelete, fileInfo.name));
 
                 if (!source.delete()) {
                     fails.add(new ModelFilesActionResponse.Fail(fileInfo, new Exception("Fail delete file")));
@@ -734,7 +734,7 @@ public class ManagerOfFiles implements IManagerOfFiles {
                 File dest = new File(newFilePaths.get(fileInfo));
                 boolean destExists = dest.exists();
 
-                managerOfThreads.safeAccept(callbackProgress, new ModelRequestProgress(i + 1, totalFiles, fileInfo.name));
+                managerOfThreads.safeAccept(callbackProgress, new ModelProgress(i + 1, totalFiles, fileInfo.name));
 
                 if (destExists && request.duplicateNamePolicy == ModelFilesActionRequest.DuplicateNamePolicy.Skip
                         || Objects.equals(source.getAbsolutePath(), dest.getAbsolutePath())
@@ -773,7 +773,7 @@ public class ManagerOfFiles implements IManagerOfFiles {
                                 fails.add(new ModelFilesActionResponse.Fail(fileInfo2, new Exception("Fail delete file")));
                             }
 
-                            managerOfThreads.safeAccept(callbackProgress, new ModelRequestProgress(j + 1, totalFilesToDelete, fileInfo2.name));
+                            managerOfThreads.safeAccept(callbackProgress, new ModelProgress(j + 1, totalFilesToDelete, fileInfo2.name));
                         }
                     }
                     if (dest.exists() || dest.mkdirs()) {
@@ -914,7 +914,7 @@ public class ManagerOfFiles implements IManagerOfFiles {
             File[] folderFiles = folder.listFiles();
             if (folderFiles == null) folderFiles = new File[0];
             managerOfDatabase.actualizeFiles(folder, folderFiles);
-            return onlyFolders ? (File[]) Arrays.stream(folderFiles).filter(File::isDirectory).toArray() : folderFiles;
+            return onlyFolders ? (File[]) Arrays.stream(folderFiles).filter(File::isDirectory).toArray(File[]::new) : folderFiles;
         };
 
         File[] folderFiles = null;

@@ -2,14 +2,13 @@ package com.nti.nice_gallery.views.buttons;
 
 import android.content.Context;
 import android.util.AttributeSet;
-import android.view.View;
 
 import com.nti.nice_gallery.R;
 import com.nti.nice_gallery.data.ManagerOfFiles;
 import com.nti.nice_gallery.models.ModelFilesActionRequest;
 import com.nti.nice_gallery.models.ModelFilesActionResponse;
 import com.nti.nice_gallery.models.ModelMediaFile;
-import com.nti.nice_gallery.models.ModelRequestProgress;
+import com.nti.nice_gallery.models.ModelProgress;
 import com.nti.nice_gallery.utils.Convert;
 import com.nti.nice_gallery.utils.ManagerOfDialogs;
 import com.nti.nice_gallery.utils.ManagerOfNotifications;
@@ -17,7 +16,6 @@ import com.nti.nice_gallery.utils.ManagerOfThreads;
 import com.nti.nice_gallery.utils.ReadOnlyList;
 
 import java.util.HashMap;
-import java.util.Objects;
 import java.util.function.Consumer;
 
 public class ButtonReplaceFiles extends ButtonBase {
@@ -27,7 +25,7 @@ public class ButtonReplaceFiles extends ButtonBase {
     private Consumer<ButtonReplaceFiles> actionFinishedListener;
     private Consumer<ButtonReplaceFiles> actionProgressListener;
     private ModelFilesActionRequest request;
-    private ModelRequestProgress progress;
+    private ModelProgress progress;
 
     private ManagerOfDialogs managerOfDialogs;
     private ManagerOfNotifications managerOfNotifications;
@@ -68,7 +66,7 @@ public class ButtonReplaceFiles extends ButtonBase {
         this.files = files;
     }
 
-    public ModelRequestProgress getProgress() {
+    public ModelProgress getProgress() {
         return progress;
     }
 
@@ -98,7 +96,7 @@ public class ButtonReplaceFiles extends ButtonBase {
             });
         };
 
-        Consumer<ModelRequestProgress> onProgress = progress -> {
+        Consumer<ModelProgress> onProgress = progress -> {
             this.progress = progress;
             if (actionProgressListener != null) {
                 actionProgressListener.accept(this);

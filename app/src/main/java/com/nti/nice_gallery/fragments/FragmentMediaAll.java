@@ -5,6 +5,7 @@ import android.os.Bundle;
 import androidx.annotation.StringRes;
 import androidx.fragment.app.Fragment;
 
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -23,7 +24,7 @@ import com.nti.nice_gallery.models.ModelFilters;
 import com.nti.nice_gallery.models.ModelGetFilesRequest;
 import com.nti.nice_gallery.models.ModelGetFilesResponse;
 import com.nti.nice_gallery.models.ModelMediaFile;
-import com.nti.nice_gallery.models.ModelRequestProgress;
+import com.nti.nice_gallery.models.ModelProgress;
 import com.nti.nice_gallery.models.ModelScanParams;
 import com.nti.nice_gallery.utils.CallbackShell;
 import com.nti.nice_gallery.utils.ManagerOfDialogs;
@@ -49,7 +50,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.function.Consumer;
-import java.util.function.Function;
 import java.util.function.Supplier;
 
 public class FragmentMediaAll extends Fragment {
@@ -61,7 +61,7 @@ public class FragmentMediaAll extends Fragment {
     private static boolean isBusy = false;
     private static String statusInfo = null;
     private static final CallbackShell.ForRunnable onActionFinishedShell = new CallbackShell.ForRunnable();
-    private static final CallbackShell.ForConsumer<ModelRequestProgress> onActionProgressShell = new CallbackShell.ForConsumer<>();
+    private static final CallbackShell.ForConsumer<ModelProgress> onActionProgressShell = new CallbackShell.ForConsumer<>();
 
     private ModelGetFilesRequest request;
     private ModelGetFilesResponse response;
@@ -158,6 +158,7 @@ public class FragmentMediaAll extends Fragment {
                     } else {
                         viewMediaGrid.setScanInProgress(false);
                         managerOfDialogs.showInfo(R.string.dialog_title_something_wrong, R.string.message_error_scanning_failed);
+                        Log.e(LOG_TAG + "-260908-1", "", response.error);
                     }
                 });
             });
@@ -254,7 +255,7 @@ public class FragmentMediaAll extends Fragment {
             });
         };
 
-        Consumer<ModelRequestProgress> onActionProgress = progress -> {
+        Consumer<ModelProgress> onActionProgress = progress -> {
             managerOfThreads.runOnUiThread(() -> {
                 statusInfo = tryGetString(R.string.format_status_info_action_progress, progress.currentStep, progress.numberCompletedSteps, progress.numberTotalSteps);
                 onStatusInfoChanged.run();
