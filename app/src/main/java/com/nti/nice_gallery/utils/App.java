@@ -25,6 +25,7 @@ public class App extends Application implements Application.ActivityLifecycleCal
     private void init() {
         managerOfDatabase = new ManagerOfDatabase(this);
         managerOfThreads = new ManagerOfThreads(this);
+        ManagerOfNotifications.appStartInit(this);
     }
 
     private void onAppStart() {

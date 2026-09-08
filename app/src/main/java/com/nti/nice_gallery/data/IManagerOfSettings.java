@@ -24,4 +24,7 @@ public interface IManagerOfSettings {
 
     ReadOnlyList<String> getPathsHistory();
     void savePathToHistory(String path);
+
+    int getLastNotificationId();
+    void saveLastNotificationId(int id);
 }

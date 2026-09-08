@@ -62,7 +62,6 @@ public class ManagerOfSettings implements IManagerOfSettings {
     @Override
     public ModelScanParams getScanParams() {
         String jsonStr = preferences.getString(SCAN_PARAMS_KEY, null);
-        Log.i(LOG_TAG + 1, jsonStr != null ? jsonStr : "null");
         return jsonStr == null ? scanParamsDefault : new ModelScanParams(jsonStr);
     }
 
@@ -72,7 +71,6 @@ public class ManagerOfSettings implements IManagerOfSettings {
         SharedPreferences.Editor editor = preferences.edit();
         editor.putString(SCAN_PARAMS_KEY, jsonStr);
         editor.apply();
-        Log.i(LOG_TAG + 2, jsonStr);
     }
 
     private static final String FILTERS_KEY = "filters";
@@ -80,7 +78,6 @@ public class ManagerOfSettings implements IManagerOfSettings {
     @Override
     public ModelFilters getFilters() {
         String jsonStr = preferences.getString(FILTERS_KEY, null);
-        Log.i(LOG_TAG + 3, jsonStr != null ? jsonStr : "null");
         return jsonStr == null ? filtersDefault : new ModelFilters(jsonStr);
     }
 
@@ -90,7 +87,6 @@ public class ManagerOfSettings implements IManagerOfSettings {
         SharedPreferences.Editor editor = preferences.edit();
         editor.putString(FILTERS_KEY, jsonStr);
         editor.apply();
-        Log.i(LOG_TAG + 4, jsonStr != null ? jsonStr : "null");
     }
 
     private static final String GRID_VARIANT_KEY = "gridVariant";
@@ -144,6 +140,20 @@ public class ManagerOfSettings implements IManagerOfSettings {
         String jsonStr = JsonUtil.stringifyArrayOfPrimitives(pathsHistory);
         SharedPreferences.Editor editor = preferences.edit();
         editor.putString(PATHS_HISTORY_KEY, jsonStr);
+        editor.apply();
+    }
+
+    private static final String LAST_NOTIFICATIONS_ID_KEY = "lastNotificationsId";
+
+    @Override
+    public int getLastNotificationId() {
+        return preferences.getInt(LAST_NOTIFICATIONS_ID_KEY, -1);
+    }
+
+    @Override
+    public void saveLastNotificationId(int id) {
+        SharedPreferences.Editor editor = preferences.edit();
+        editor.putInt(LAST_NOTIFICATIONS_ID_KEY, id);
         editor.apply();
     }
 }

@@ -3,23 +3,25 @@ package com.nti.nice_gallery.utils;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
-import android.app.PendingIntent;
 import android.content.Context;
-import android.content.Intent;
 import android.widget.Toast;
 
 import androidx.annotation.StringRes;
 import androidx.core.app.NotificationCompat;
 
 import com.nti.nice_gallery.R;
+import com.nti.nice_gallery.data.Domain;
+import com.nti.nice_gallery.data.IManagerOfSettings;
 
 import java.util.function.Consumer;
 
 public class ManagerOfNotifications {
 
-    private static final int MIN_ID = 100_000;
-    private static final int MAX_ID = 999_999;
-    private static int LAST_ID = MIN_ID;
+    private static final int MIN_ID = 1_000;
+    private static final int MAX_ID = Integer.MAX_VALUE;
+    private static int lastId = MIN_ID;
+
+    private static IManagerOfSettings managerOfSettings;
 
     private final Context context;
     private final NotificationManager notificationManager;
@@ -29,10 +31,19 @@ public class ManagerOfNotifications {
         this.notificationManager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
     }
 
+    public static void appStartInit(Context context) {
+        managerOfSettings = Domain.getManagerOfSettings(context);
+        int savedLastId = managerOfSettings.getLastNotificationId();
+        if (savedLastId > lastId) {
+            lastId = savedLastId;
+        }
+    }
+
     public static int getNextId() {
-        int id = LAST_ID;
-        if (id > MAX_ID) throw new RuntimeException("The value is outside the acceptable range: ManagerOfNotifications.getNextId.id");
-        LAST_ID++;
+        int id = lastId;
+        if (id == MAX_ID) throw new RuntimeException("The value is outside the acceptable range: ManagerOfNotifications.getNextId.id");
+        lastId++;
+        managerOfSettings.saveLastNotificationId(lastId);
         return id;
     }
 
