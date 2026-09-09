@@ -12,7 +12,9 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -57,7 +59,6 @@ public class ManagerOfDatabase {
 
     public void forEachFile(Function<FileData, Boolean> handler) {
         Boolean stop = false;
-
         for (Map.Entry<String, ConcurrentHashMap<String, FileData>> outerEntry : filesRepos.entrySet()) {
             ConcurrentHashMap<String, FileData> innerMap = outerEntry.getValue();
             for (Map.Entry<String, FileData> innerEntry : innerMap.entrySet()) {
@@ -66,6 +67,20 @@ public class ManagerOfDatabase {
                 if (stop) break;
             }
             if (stop) break;
+        }
+    }
+
+    public void forEachFileInFolder(String parentPath, Function<FileData, Boolean> handler) {
+        if (parentPath.endsWith("/")) parentPath = parentPath.substring(0, parentPath.length() - 1);
+
+        ConcurrentHashMap<String, FileData> parentFiles = filesRepos.getOrDefault(parentPath, null);
+        if (parentFiles == null) {
+            return;
+        }
+
+        for (Map.Entry<String, FileData> innerEntry : parentFiles.entrySet()) {
+            FileData fileData = innerEntry.getValue();
+            if (handler.apply(fileData)) break;
         }
     }
 
@@ -127,13 +142,21 @@ public class ManagerOfDatabase {
 
     public void actualizeFiles(File parent, File[] children) {
         String parentPath = parent.getAbsolutePath();
+        boolean hasFolderChildren = false;
+        FileData fileData = getOrCreateFile(parentPath);
+        LocalDateTime parentLastUpdate = Instant.ofEpochMilli(parent.lastModified())
+                .atZone(ZoneId.systemDefault()).toLocalDateTime();
+
         ConcurrentHashMap<String, FileData> parentMap = filesRepos.getOrDefault(parentPath, null);
         if (parentMap == null) return;
 
         HashSet<String> childrenSet = new HashSet<>();
         for (File file : children) {
             childrenSet.add(file.getName());
+            if (file.isDirectory()) hasFolderChildren = true;
         }
+
+        fileData.setActualizationInfo(new ActualizationInfo(parentLastUpdate, hasFolderChildren));
 
         for (String name : parentMap.keySet()) {
             if (!childrenSet.contains(name)) {
@@ -246,6 +269,8 @@ public class ManagerOfDatabase {
 
         @Nullable
         private ModelMediaFile fileInfoCache;
+        @Nullable
+        private ActualizationInfo actualizationInfo;
 
         public FileData(String parentPath, String name) {
             this.parentPath = parentPath;
@@ -260,6 +285,25 @@ public class ManagerOfDatabase {
 
         public void setFileInfoCache(@Nullable ModelMediaFile fileInfoCache) {
             this.fileInfoCache = fileInfoCache;
+        }
+
+        @Nullable
+        public ActualizationInfo getActualizationInfo() {
+            return actualizationInfo;
+        }
+
+        private void setActualizationInfo(@Nullable ActualizationInfo info) {
+            this.actualizationInfo = info;
+        }
+    }
+
+    public static class ActualizationInfo {
+        public final LocalDateTime updatedAt;
+        public final boolean hasFolderChildren;
+
+        public ActualizationInfo(LocalDateTime updatedAt, boolean hasFolderChildren) {
+            this.updatedAt = updatedAt;
+            this.hasFolderChildren = hasFolderChildren;
         }
     }
 }

@@ -218,9 +218,7 @@ public class ManagerOfFiles implements IManagerOfFiles {
         Runnable returnFolderFilesList = () -> {
             final LocalDateTime startedAt = LocalDateTime.now();
 
-            final List<File> files = new ArrayList<>();
-            scanFolder(files, new File(requestFinal.path));
-            getFilesInfoAsync(files, filesInfo -> {
+            scanFolderAsync(new File(requestFinal.path), filesInfo -> {
                 final List<ModelMediaFile> filteredFiles = filesInfo.stream().filter(f -> filterCheck(f, requestFinal.filters))
                         .collect(Collectors.toList());
 
@@ -248,50 +246,49 @@ public class ManagerOfFiles implements IManagerOfFiles {
             final LocalDateTime startedAt = LocalDateTime.now();
 
             getStoragesAsync(null, getStoragesResponse -> {
-                final List<File> files = new ArrayList<>();
                 final List<ModelStorage> storagesWithErrors = new ArrayList<>();
 
                 for (ModelStorage storage : getStoragesResponse.storages) {
-                    if (storage.error == null) {
-                        ModelScanParams.StorageParams storageParams = null;
-
-                        if (requestFinal.scanParams != null && requestFinal.scanParams.storagesParams != null) {
-                            storageParams = requestFinal.scanParams.storagesParams
-                                    .stream()
-                                    .filter(sp -> Objects.equals(sp.storageName, storage.name))
-                                    .findFirst()
-                                    .orElse(null);
-                        }
-
-                        Boolean ignoreHidden = requestFinal.filters != null ? requestFinal.filters.ignoreHidden : false;
-                        scanStorage(files, new File(storage.path), storageParams, ignoreHidden);
-                    } else {
+                    if (storage.error != null) {
                         storagesWithErrors.add(storage);
+                        continue;
                     }
+
+                    ModelScanParams.StorageParams storageParams = null;
+
+                    if (requestFinal.scanParams != null && requestFinal.scanParams.storagesParams != null) {
+                        storageParams = requestFinal.scanParams.storagesParams
+                                .stream()
+                                .filter(sp -> Objects.equals(sp.storageName, storage.name))
+                                .findFirst()
+                                .orElse(null);
+                    }
+
+                    Boolean ignoreHidden = requestFinal.filters != null ? requestFinal.filters.ignoreHidden : false;
+
+                    scanStorageAsync(new File(storage.path), storageParams, ignoreHidden, filesInfo -> {
+                        final List<ModelMediaFile> filteredFiles = filesInfo.stream().filter(f -> filterCheck(f, requestFinal.filters))
+                                .collect(Collectors.toList());
+
+                        final List<ModelMediaFile> filesWithErrors = filteredFiles.stream().filter(f -> f.error != null)
+                                .collect(Collectors.toList());
+
+                        final List<ModelMediaFile> sortedFiles = sortFiles(filteredFiles, requestFinal.sortVariant, requestFinal.foldersFirst);
+
+                        ModelGetFilesResponse getFilesResponse = new ModelGetFilesResponse(
+                                startedAt,
+                                LocalDateTime.now(),
+                                new ReadOnlyList<>(sortedFiles),
+                                getStoragesResponse.storages,
+                                new ReadOnlyList<>(filesWithErrors),
+                                new ReadOnlyList<>(storagesWithErrors),
+                                null,
+                                null
+                        );
+
+                        managerOfThreads.safeAccept(callback, getFilesResponse);
+                    });
                 }
-
-                getFilesInfoAsync(files, filesInfo -> {
-                    final List<ModelMediaFile> filteredFiles = filesInfo.stream().filter(f -> filterCheck(f, requestFinal.filters))
-                            .collect(Collectors.toList());
-
-                    final List<ModelMediaFile> filesWithErrors = filteredFiles.stream().filter(f -> f.error != null)
-                            .collect(Collectors.toList());
-
-                    final List<ModelMediaFile> sortedFiles = sortFiles(filteredFiles, requestFinal.sortVariant, requestFinal.foldersFirst);
-
-                    ModelGetFilesResponse getFilesResponse = new ModelGetFilesResponse(
-                            startedAt,
-                            LocalDateTime.now(),
-                            new ReadOnlyList<>(sortedFiles),
-                            getStoragesResponse.storages,
-                            new ReadOnlyList<>(filesWithErrors),
-                            new ReadOnlyList<>(storagesWithErrors),
-                            null,
-                            null
-                    );
-
-                    managerOfThreads.safeAccept(callback, getFilesResponse);
-                });
             });
         };
 
@@ -865,9 +862,15 @@ public class ManagerOfFiles implements IManagerOfFiles {
         }
     }
 
-    // записывает в files список файлов и папок в заданной папке
-    private void scanFolder(List<File> files, File folder) {
+    // возвращает список файлов и папок в заданной папке
+    private void scanFolderAsync(File folder, Consumer<List<ModelMediaFile>> callback) {
         if (folder == null) {
+            return;
+        }
+
+        List<ModelMediaFile> cachedList = managerOfCache.getFolderFiles(folder);
+        if (cachedList != null) {
+            managerOfThreads.safeAccept(callback, cachedList);
             return;
         }
 
@@ -878,12 +881,23 @@ public class ManagerOfFiles implements IManagerOfFiles {
         }
 
         managerOfDatabase.actualizeFiles(folder, folderFiles);
-        files.addAll(Arrays.asList(folderFiles));
+        getFilesInfoAsync(Arrays.asList(folderFiles), filesInfo -> {
+            managerOfThreads.safeAccept(callback, filesInfo);
+        });
+    }
+
+    private void scanStorageAsync(File folder, ModelScanParams.StorageParams scanParams, Boolean ignoreHidden, Consumer<List<ModelMediaFile>> callback) {
+        List<ModelMediaFile> filesInfo = new ArrayList<>();
+        List<File> filesNoCache = new ArrayList<>();
+        scanStorage(filesInfo, filesNoCache, folder, scanParams, ignoreHidden);
+        getFilesInfoAsync(filesNoCache, newFilesInfo -> {
+            filesInfo.addAll(newFilesInfo);
+            managerOfThreads.safeAccept(callback, filesInfo);
+        });
     }
 
     // записывает в files список файлов из всех вложенных подпапок из заданной папки, соотвествующих scanParams
-    private void scanStorage(List<File> files, File folder, ModelScanParams.StorageParams scanParams, Boolean ignoreHidden) {
-
+    private void scanStorage(List<ModelMediaFile> filesInfoCached, List<File> filesNoCache, File folder, ModelScanParams.StorageParams scanParams, Boolean ignoreHidden) {
         final int PATH_IS_NOT_TARGET = 0;
         final int PATH_IS_TARGET = 1;
         final int PATH_IS_TARGET_CHILD = 2;
@@ -918,22 +932,35 @@ public class ManagerOfFiles implements IManagerOfFiles {
         };
 
         File[] folderFiles = null;
-        int pathStatus = -1;
 
-        if (scanParams != null) {
-            pathStatus = getPathStatus.invoke(folder.getAbsolutePath(), scanParams.paths);
-            if (scanParams.scanMode == ModelScanParams.ScanMode.ScanAll) {
-                folderFiles = getFolderFilesAndActualize.invoke(false);
-            } else if (scanParams.scanMode == ModelScanParams.ScanMode.ScanPathsInListOnly) {
+        if (scanParams != null && scanParams.scanMode != ModelScanParams.ScanMode.ScanAll) {
+            String absolutPath = folder.getAbsolutePath();
+            int pathStatus = getPathStatus.invoke(absolutPath, scanParams.paths);
+
+            if (scanParams.scanMode == ModelScanParams.ScanMode.ScanPathsInListOnly) {
                 switch (pathStatus) {
                     case PATH_IS_TARGET_PARENT: folderFiles = getFolderFilesAndActualize.invoke(true); break;
                     case PATH_IS_TARGET:
-                    case PATH_IS_TARGET_CHILD: folderFiles = getFolderFilesAndActualize.invoke(false); break;
+                    case PATH_IS_TARGET_CHILD:
+                        List<ModelMediaFile> cachedList = managerOfCache.getFolderFiles(folder);
+                        if (cachedList != null) {
+                            filesInfoCached.addAll(cachedList.stream().filter(f -> f.isFile).collect(Collectors.toList()));
+                            return;
+                        }
+                        folderFiles = getFolderFilesAndActualize.invoke(false);
+                        break;
                 }
             } else if (scanParams.scanMode == ModelScanParams.ScanMode.ScanPathsNotInListOnly) {
                 switch (pathStatus) {
                     case PATH_IS_NOT_TARGET:
-                    case PATH_IS_TARGET_PARENT: folderFiles = getFolderFilesAndActualize.invoke(false); break;
+                    case PATH_IS_TARGET_PARENT:
+                        List<ModelMediaFile> cachedList = managerOfCache.getFolderFiles(folder);
+                        if (cachedList != null) {
+                            filesInfoCached.addAll(cachedList.stream().filter(f -> f.isFile).collect(Collectors.toList()));
+                            return;
+                        }
+                        folderFiles = getFolderFilesAndActualize.invoke(false);
+                        break;
                 }
             }
         } else {
@@ -947,9 +974,9 @@ public class ManagerOfFiles implements IManagerOfFiles {
         for (File file : folderFiles) {
             if (!(ignoreHidden == true && file.isHidden())) {
                 if (file.isDirectory()) {
-                    scanStorage(files, file, scanParams, ignoreHidden);
+                    scanStorage(filesInfoCached, filesNoCache, file, scanParams, ignoreHidden);
                 } else {
-                    files.add(file);
+                    filesNoCache.add(file);
                 }
             }
         }

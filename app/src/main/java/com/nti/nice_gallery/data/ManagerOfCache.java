@@ -20,13 +20,17 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public class ManagerOfCache {
+    private static final String LOG_TAG = "ManagerOfCache";
+    private static final long MAX_CACHE_SIZE_BYTES = 500 * 1024 * 1024;
+    private static final boolean CACHE_PREVIEW_DRAWABLE = false;
+
     private static final Map<String, PreviewCacheList> previewsCache = new LinkedHashMap<>();
     private static final ReentrantReadWriteLock cacheLock = new ReentrantReadWriteLock();
 
-    private static final long MAX_CACHE_SIZE_BYTES = 500 * 1024 * 1024;
     private static long currentPreviewCacheWeightBytes = 0;
 
     private final Context context;
@@ -96,7 +100,8 @@ public class ManagerOfCache {
 
     public void cachePreview(ModelMediaFile fileInfo, Size targetSize, ModelGetPreviewResponse response) {
         if (fileInfo == null || targetSize == null || response == null) return;
-        if (response.previewBitmap == null && response.previewDrawable == null) return;
+        if (!CACHE_PREVIEW_DRAWABLE && response.previewDrawable != null) return;
+        if (response.previewBitmap == null) return;
 
         cacheLock.writeLock().lock();
         try {
@@ -136,6 +141,38 @@ public class ManagerOfCache {
             }
         } finally {
             cacheLock.readLock().unlock();
+        }
+
+        return null;
+    }
+
+    // возвращает готовый список файлов папки только если в папке нет подпапок и есть кэш всех файлов
+    public List<ModelMediaFile> getFolderFiles(File folder) {
+        if (folder == null) return null;
+
+        String absolutPath = folder.getAbsolutePath();
+        LocalDateTime lastUpdate = Instant.ofEpochMilli(folder.lastModified())
+                .atZone(ZoneId.systemDefault()).toLocalDateTime();
+
+        ManagerOfDatabase.ActualizationInfo actualizationInfo = managerOfDatabase.getOrCreateFile(absolutPath).getActualizationInfo();
+        AtomicBoolean cacheIsFull = new AtomicBoolean(true);
+
+        if (actualizationInfo != null && lastUpdate.isEqual(actualizationInfo.updatedAt) && !actualizationInfo.hasFolderChildren) {
+
+            List<ModelMediaFile> result = new ArrayList<>();
+            managerOfDatabase.forEachFileInFolder(absolutPath, fileData -> {
+                ModelMediaFile cache = fileData.getFileInfoCache();
+                result.add(cache);
+                if (cache == null) {
+                    cacheIsFull.set(false);
+                    return true;
+                }
+                return false;
+            });
+
+            if (cacheIsFull.get() && !result.isEmpty()) {
+                return result;
+            }
         }
 
         return null;

@@ -139,9 +139,13 @@ public class ManagerOfBackground {
 
         public void cancel() {
             isCancelled.set(true);
-//            if (future != null && !future.isDone()) {
-//                future.cancel(true);
-//            }
+
+        }
+
+        public void kill() {
+            if (future != null && !future.isDone()) {
+                future.cancel(true);
+            }
         }
 
         protected void notifyProgress(ModelProgress progress) {

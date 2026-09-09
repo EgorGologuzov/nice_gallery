@@ -6,6 +6,7 @@ import android.graphics.Matrix;
 import android.graphics.drawable.AnimatedImageDrawable;
 import android.graphics.drawable.Drawable;
 import android.media.MediaPlayer;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -16,6 +17,9 @@ import android.view.ScaleGestureDetector;
 import android.view.SurfaceView;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowInsets;
+import android.view.WindowInsetsController;
+import android.view.WindowManager;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -167,6 +171,7 @@ public class ActivityMediaView extends AppCompatActivity {
             int visibility = isToolPanelsVisible ? View.VISIBLE : View.GONE;
             topActionBar.setVisibility(visibility);
             bottomPanel.setVisibility(visibility);
+            setAndroidStatusBarVisibility(isToolPanelsVisible);
         };
 
         Runnable onCurrentFileChange = () -> {
@@ -882,6 +887,20 @@ public class ActivityMediaView extends AppCompatActivity {
         super.onStop();
         if (onStopActivity != null) {
             onStopActivity.run();
+        }
+    }
+
+    private void setAndroidStatusBarVisibility(boolean isVisible) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            WindowInsetsController controller = getWindow().getInsetsController();
+            if (controller != null) {
+                if (isVisible) {
+                    controller.show(WindowInsets.Type.statusBars());
+                } else {
+                    controller.hide(WindowInsets.Type.statusBars());
+                    controller.setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+                }
+            }
         }
     }
 

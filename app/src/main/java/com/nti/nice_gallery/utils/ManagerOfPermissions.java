@@ -14,10 +14,29 @@ import com.nti.nice_gallery.activities.ActivityMain;
 
 public class ManagerOfPermissions {
 
-    private final Context context;
+    private final ActivityMain activityMain;
 
-    public ManagerOfPermissions(Context context) {
-        this.context = context;
+    public ManagerOfPermissions(ActivityMain activityMain) {
+        this.activityMain = activityMain;
+        initManageExternalStoragePermissionLauncher();
+        initPostNotificationLauncher();
+    }
+
+    private ActivityResultLauncher<Intent> onManageExternalStorageLauncher;
+    private Runnable onManageExternalStorageGranted;
+    private Runnable onManageExternalStorageDenied;
+
+    private void initManageExternalStoragePermissionLauncher() {
+        onManageExternalStorageLauncher = activityMain.registerForActivityResult(
+                new ActivityResultContracts.StartActivityForResult(),
+                result -> {
+                    if (hasManageExternalStoragePermission()) {
+                        if (onManageExternalStorageGranted != null) onManageExternalStorageGranted.run();
+                        return;
+                    }
+                    if (onManageExternalStorageDenied != null) onManageExternalStorageDenied.run();
+                }
+        );
     }
 
     public boolean hasManageExternalStoragePermission() {
@@ -25,31 +44,21 @@ public class ManagerOfPermissions {
     }
 
     public void requestExternalStorageManagerPermission(Runnable onGranted, Runnable onDenied) {
-        ActivityMain activityMain = (ActivityMain) context;
-
         if (hasManageExternalStoragePermission()) {
             if (onGranted != null) onGranted.run();
             return;
         }
 
-        final ActivityResultLauncher<Intent> storageLauncher = activityMain.registerForActivityResult(
-                new ActivityResultContracts.StartActivityForResult(),
-                result -> {
-                    if (hasManageExternalStoragePermission()) {
-                        if (onGranted != null) onGranted.run();
-                        return;
-                    }
-                    if (onDenied != null) onDenied.run();
-                }
-        );
+        onManageExternalStorageGranted = onGranted;
+        onManageExternalStorageDenied = onDenied;
 
         final Runnable openPermissionSettings = () -> {
             Intent intent = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION);
             intent.setData(Uri.parse("package:" + activityMain.getPackageName()));
-            storageLauncher.launch(intent);
+            onManageExternalStorageLauncher.launch(intent);
         };
 
-        ManagerOfDialogs managerOfDialogs = new ManagerOfDialogs(context);
+        ManagerOfDialogs managerOfDialogs = new ManagerOfDialogs(activityMain);
         managerOfDialogs.showYesNo(
                 R.string.dialog_title_permission_required,
                 R.string.message_request_manage_external_storage,
@@ -58,10 +67,27 @@ public class ManagerOfPermissions {
         );
     }
 
+    private ActivityResultLauncher<String> postNotificationLauncher;
+    private Runnable onPostNotificationGranted;
+    private Runnable onPostNotificationDenied;
+
+    private void initPostNotificationLauncher() {
+        postNotificationLauncher = activityMain.registerForActivityResult(
+                new ActivityResultContracts.RequestPermission(),
+                isGranted -> {
+                    if (isGranted) {
+                        if (onPostNotificationGranted != null) onPostNotificationGranted.run();
+                    } else {
+                        if (onPostNotificationDenied != null) onPostNotificationDenied.run();
+                    }
+                }
+        );
+    }
+
     public boolean hasPostNotificationsPermission() {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
             return androidx.core.content.ContextCompat.checkSelfPermission(
-                    context,
+                    activityMain,
                     android.Manifest.permission.POST_NOTIFICATIONS
             ) == android.content.pm.PackageManager.PERMISSION_GRANTED;
         }
@@ -70,26 +96,16 @@ public class ManagerOfPermissions {
     }
 
     public void requestPostNotificationsPermission(Runnable onGranted, Runnable onDenied) {
-        ActivityMain activityMain = (ActivityMain) context;
-
         if (hasPostNotificationsPermission()) {
             if (onGranted != null) onGranted.run();
             return;
         }
 
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-            final ActivityResultLauncher<String> notificationLauncher = activityMain.registerForActivityResult(
-                    new ActivityResultContracts.RequestPermission(),
-                    isGranted -> {
-                        if (isGranted) {
-                            if (onGranted != null) onGranted.run();
-                        } else {
-                            if (onDenied != null) onDenied.run();
-                        }
-                    }
-            );
+        onPostNotificationGranted = onGranted;
+        onPostNotificationDenied = onDenied;
 
-            notificationLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS);
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            postNotificationLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS);
         } else {
             if (onGranted != null) onGranted.run();
         }
