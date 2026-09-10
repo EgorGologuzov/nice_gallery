@@ -17,13 +17,14 @@ import com.nti.nice_gallery.utils.ManagerOfDialogs;
 import com.nti.nice_gallery.utils.ManagerOfNotifications;
 import com.nti.nice_gallery.views.buttons.ButtonBase;
 
-import java.time.LocalDateTime;
+import java.util.function.Function;
 
 public class ViewCacheState extends LinearLayout {
 
     private ManagerOfCache managerOfCache;
     private ManagerOfDialogs managerOfDialogs;
     private ManagerOfNotifications managerOfNotifications;
+    private ManagerOfDatabase managerOfDatabase;
 
     public ViewCacheState(Context context) {
         super(context);
@@ -46,10 +47,12 @@ public class ViewCacheState extends LinearLayout {
         managerOfCache = new ManagerOfCache(getContext());
         managerOfDialogs = new ManagerOfDialogs(getContext());
         managerOfNotifications = new ManagerOfNotifications(getContext());
+        managerOfDatabase = new ManagerOfDatabase(getContext());
 
         TextView textFilesCacheInfo = findViewById(R.id.textFilesCacheInfo);
-        ButtonBase buttonFilesCacheDetails = findViewById(R.id.buttonFilesCacheDetails);
         ButtonBase buttonFilesCacheClear = findViewById(R.id.buttonFilesCacheClear);
+        TextView textActualizationCacheInfo = findViewById(R.id.textActualizationCacheInfo);
+        ButtonBase buttonActualizationCacheClear = findViewById(R.id.buttonActualizationCacheClear);
         TextView textPreviewCacheInfo = findViewById(R.id.textPreviewsCacheInfo);
         ButtonBase buttonPreviewCacheClear = findViewById(R.id.buttonPreviewsCacheClear);
 
@@ -58,6 +61,22 @@ public class ViewCacheState extends LinearLayout {
         this.setGravity(Gravity.CENTER_VERTICAL);
         this.setOrientation(VERTICAL);
 
+        Function<ManagerOfDatabase.Statistic, String> buildCachedFilesInfoString = stat -> {
+            return getContext().getString(
+                    R.string.format_info_files_cache,
+                    stat.getCachedFilesCount(),
+                    stat.getSavedCachedFilesCount()
+            );
+        };
+
+        Function<ManagerOfDatabase.Statistic, String> buildActualizationInfoString = stat -> {
+            return getContext().getString(
+                    R.string.format_info_actualization_cache,
+                    stat.getActualizationInfoCount(),
+                    stat.getSavedActualizationInfoCount()
+            );
+        };
+
         View.OnClickListener onClickButtonFilesCacheClear = btn -> {
               managerOfDialogs.showYesNo(
                       R.string.dialog_title_submit_deletion,
@@ -65,10 +84,25 @@ public class ViewCacheState extends LinearLayout {
                       () -> {
                           managerOfCache.clearFilesInfoCache();
                           managerOfNotifications.showToast(R.string.message_cache_cleared);
-                          textFilesCacheInfo.setText(managerOfCache.getFilesCacheInfo());
+                          ManagerOfDatabase.Statistic stat = managerOfDatabase.getStatistic(true);
+                          textFilesCacheInfo.setText(buildCachedFilesInfoString.apply(stat));
                       },
                       null
               );
+        };
+
+        View.OnClickListener onClickButtonActualizationCacheClear = btn -> {
+            managerOfDialogs.showYesNo(
+                    R.string.dialog_title_submit_deletion,
+                    R.string.message_question_submit_cache_clear,
+                    () -> {
+                        managerOfDatabase.clearActualizationInfo();
+                        managerOfNotifications.showToast(R.string.message_cache_cleared);
+                        ManagerOfDatabase.Statistic stat = managerOfDatabase.getStatistic(true);
+                        textActualizationCacheInfo.setText(buildActualizationInfoString.apply(stat));
+                    },
+                    null
+            );
         };
 
         View.OnClickListener onClickButtonPreviewCacheClear = btn -> {
@@ -84,31 +118,14 @@ public class ViewCacheState extends LinearLayout {
             );
         };
 
-        View.OnClickListener onClickButtonFilesCacheDetails = btn -> {
-            ManagerOfDatabase.TxtFile cacheTxt = managerOfCache.getFilesCacheTxt();
+        ManagerOfDatabase.Statistic stat = managerOfDatabase.getStatistic(true);
 
-            String details = null;
-
-            if (cacheTxt == null) {
-                details = getContext().getString(R.string.message_file_not_exists);
-            } else if (cacheTxt.strings != null) {
-                int rowsCount = cacheTxt.strings.length;
-                LocalDateTime updatedAt = cacheTxt.updatedAt;
-                String updatedAtStr = updatedAt != null ? updatedAt.toString() : null;
-                details = getContext().getString(R.string.format_info_file_txt, rowsCount, updatedAtStr);
-            }
-
-            managerOfDialogs.showInfo(
-                    R.string.dialog_title_details,
-                    details
-            );
-        };
-
-        textFilesCacheInfo.setText(managerOfCache.getFilesCacheInfo());
+        textFilesCacheInfo.setText(buildCachedFilesInfoString.apply(stat));
+        textActualizationCacheInfo.setText(buildActualizationInfoString.apply(stat));
         textPreviewCacheInfo.setText(managerOfCache.getPreviewsCacheInfo());
 
-        buttonFilesCacheDetails.setOnClickListener(onClickButtonFilesCacheDetails);
         buttonFilesCacheClear.setOnClickListener(onClickButtonFilesCacheClear);
+        buttonActualizationCacheClear.setOnClickListener(onClickButtonActualizationCacheClear);
         buttonPreviewCacheClear.setOnClickListener(onClickButtonPreviewCacheClear);
     }
 }

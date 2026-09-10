@@ -40,7 +40,7 @@ public class ViewForDeveloper extends LinearLayout {
         Button buttonTest3 = findViewById(R.id.buttonTest3);
 
         buttonTest1.setOnClickListener(btn -> {
-            ManagerOfBackground.BackgroundTask timerProcess = new ManagerOfBackground.BackgroundTask() {
+            ManagerOfBackground.BackgroundTask timerTask = new ManagerOfBackground.BackgroundTask() {
                 private final int totalSeconds = 5;
 
                 @Override
@@ -73,11 +73,11 @@ public class ViewForDeveloper extends LinearLayout {
                 }
             };
 
-            managerOfBackground.startTask(timerProcess);
+            managerOfBackground.startTask(timerTask);
         });
 
         buttonTest2.setOnClickListener(btn -> {
-            ManagerOfBackground.BackgroundTask timerProcess = new ManagerOfBackground.BackgroundTask() {
+            ManagerOfBackground.BackgroundTask timerTask = new ManagerOfBackground.BackgroundTask() {
                 private final int totalSeconds = 6;
 
                 @Override
@@ -110,7 +110,7 @@ public class ViewForDeveloper extends LinearLayout {
                 }
             };
 
-            managerOfBackground.startTask(timerProcess);
+            managerOfBackground.startTask(timerTask);
         });
 
         buttonTest3.setOnClickListener(btn -> {

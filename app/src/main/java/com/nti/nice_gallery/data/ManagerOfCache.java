@@ -42,10 +42,7 @@ public class ManagerOfCache {
     }
 
     public void clearFilesInfoCache() {
-        managerOfDatabase.forEachFile(file -> {
-            file.setFileInfoCache(null);
-            return false;
-        });
+        managerOfDatabase.clearFilesInfoCache();
     }
 
     public void clearPreviewCache() {
@@ -59,21 +56,10 @@ public class ManagerOfCache {
         }
     }
 
-    public String getFilesCacheInfo() {
-        String cachedFilesCount = String.valueOf(managerOfDatabase.getCachedFiles().size());
-        ManagerOfDatabase.TxtFile cacheTxt = managerOfDatabase.getCacheTxt();
-        String storedFilesCount = cacheTxt != null && cacheTxt.strings != null ? String.valueOf(cacheTxt.strings.length) : "0";
-        return context.getString(R.string.format_info_files_cache, cachedFilesCount, storedFilesCount);
-    }
-
     public String getPreviewsCacheInfo() {
         Convert convert = new Convert(context);
         String cachedWeightStr = convert.weightToString(currentPreviewCacheWeightBytes);
         return context.getString(R.string.format_info_previews_cache, String.valueOf(previewsCache.size()), cachedWeightStr);
-    }
-
-    public ManagerOfDatabase.TxtFile getFilesCacheTxt() {
-        return managerOfDatabase.getCacheTxt();
     }
 
     public void cacheFileInfo(ModelMediaFile fileInfo) {
@@ -147,7 +133,7 @@ public class ManagerOfCache {
     }
 
     // возвращает готовый список файлов папки только если в папке нет подпапок и есть кэш всех файлов
-    public List<ModelMediaFile> getFolderFiles(File folder) {
+    public List<ModelMediaFile> getFolderFiles(File folder, boolean filesOnly) {
         if (folder == null) return null;
 
         String absolutPath = folder.getAbsolutePath();
@@ -162,11 +148,14 @@ public class ManagerOfCache {
             List<ModelMediaFile> result = new ArrayList<>();
             managerOfDatabase.forEachFileInFolder(absolutPath, fileData -> {
                 ModelMediaFile cache = fileData.getFileInfoCache();
-                result.add(cache);
+
                 if (cache == null) {
                     cacheIsFull.set(false);
                     return true;
+                } else if (!(cache.isDirectory && filesOnly)) {
+                    result.add(cache);
                 }
+
                 return false;
             });
 

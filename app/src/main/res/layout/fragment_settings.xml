@@ -38,7 +38,7 @@
         android:layout_height="wrap_content"
         android:text="@string/settings_title_for_developer"
         android:layout_marginTop="8dp"
-        android:layout_marginBottom="4dp"
+        android:layout_marginBottom="12dp"
         android:textAlignment="center"/>
 
     <com.nti.nice_gallery.views.ViewForDeveloper

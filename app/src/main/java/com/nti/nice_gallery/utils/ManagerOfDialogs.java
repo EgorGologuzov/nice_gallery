@@ -32,14 +32,18 @@ import com.nti.nice_gallery.models.ModelGetFilesResponse;
 import com.nti.nice_gallery.models.ModelGetPathsRequest;
 import com.nti.nice_gallery.models.ModelGetPathsResponse;
 import com.nti.nice_gallery.models.ModelMediaFile;
+import com.nti.nice_gallery.models.ModelStorage;
 import com.nti.nice_gallery.views.ViewInfo;
 
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
+import kotlin.jvm.functions.Function1;
 import kotlin.jvm.functions.Function2;
 import kotlin.jvm.functions.Function3;
 
@@ -529,5 +533,76 @@ public class ManagerOfDialogs {
         }
 
         showInfo(R.string.dialog_title_action_report, message.toString());
+    }
+
+    public void showScanningReport(ModelGetFilesResponse source) {
+        Supplier<String> generateReport = () -> {
+            if (source == null) {
+                return context.getString(R.string.message_scanning_report_source_not_set);
+            }
+
+            Convert convert = new Convert(context);
+            StringBuilder builder = new StringBuilder();
+            Function1<String, Integer> addLine = line -> { builder.append(line); builder.append("\n"); return 0; };
+
+            String timeStr = convert.timeIntervalToTimeString(source.scanningStartedAt, source.scanningFinishedAt);
+            String dateTimeStr = convert.dateToDateTimeString(source.scanningStartedAt, true);
+            addLine.invoke(context.getString(R.string.format_message_scanning_duration, timeStr, dateTimeStr));
+            addLine.invoke("");
+
+            if (source.error != null) {
+                addLine.invoke(context.getString(R.string.format_message_scanning_error, source.error.getMessage()));
+                return builder.toString();
+            }
+
+            if (source.scannedStorages != null && !source.scannedStorages.isEmpty()) {
+                addLine.invoke(context.getString(R.string.format_message_scanning_found_storages, source.scannedStorages.size()));
+                addLine.invoke("");
+
+                String ok = context.getString(R.string.prefix_ok);
+                String error = context.getString(R.string.prefix_error);
+
+                for (ModelStorage storage : source.scannedStorages) {
+                    addLine.invoke((storage.error == null ? ok : error) + " " + storage.description + " " + storage.name);
+                }
+
+                addLine.invoke("");
+            }
+
+            if (source.path != null) {
+                addLine.invoke(context.getString(R.string.format_message_scanning_scan_path, source.path));
+                addLine.invoke("");
+            }
+
+            int countFolders = 0, countFiles = 0;
+
+            for (ModelMediaFile file : source.files) {
+                if (file.type == ModelMediaFile.Type.Folder) {
+                    countFolders++;
+                } else {
+                    countFiles++;
+                }
+            }
+
+            addLine.invoke(context.getString(R.string.format_message_scanning_found_folders, countFolders));
+            addLine.invoke("");
+
+            addLine.invoke(context.getString(R.string.format_message_scanning_found_files, countFiles));
+            addLine.invoke("");
+
+            addLine.invoke(context.getString(R.string.format_message_scanning_files_with_errors, source.filesWithErrors.size()));
+            addLine.invoke("");
+
+            for (ModelMediaFile file : source.filesWithErrors) {
+                addLine.invoke(context.getString(R.string.format_message_scanning_file_error_info, file.name, file.error.getMessage().substring(0, 50)));
+            }
+
+            return builder.toString();
+        };
+
+        showInfo(
+                R.string.dialog_title_scanning_report,
+                generateReport.get()
+        );
     }
 }

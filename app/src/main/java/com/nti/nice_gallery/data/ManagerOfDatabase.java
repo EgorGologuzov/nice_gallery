@@ -5,6 +5,9 @@ import android.content.Context;
 import androidx.annotation.Nullable;
 
 import com.nti.nice_gallery.models.ModelMediaFile;
+import com.nti.nice_gallery.utils.JsonUtil;
+
+import org.json.JSONObject;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -25,10 +28,11 @@ import java.util.function.Function;
 
 public class ManagerOfDatabase {
     private static final String CACHE_FILES_INFO_TXT = "cache/files_info.txt";
+    private static final String FOLDERS_ACTUALIZATION_INFO_TXT = "cache/folders_actualization_info.txt";
 
     private static final ConcurrentHashMap<String, ConcurrentHashMap<String, FileData>> filesRepos = new ConcurrentHashMap<>();
 
-    private static TxtFile cacheTxt;
+    private static final Statistic statistic = new Statistic();
 
     private final Context context;
 
@@ -84,17 +88,153 @@ public class ManagerOfDatabase {
         }
     }
 
-    public int getFilesCount() {
-        int count = 0;
+    public void actualizeFiles(File parent, File[] children) {
+        String parentPath = parent.getAbsolutePath();
+        boolean hasFolderChildren = false;
+        FileData parentFileData = getOrCreateFile(parentPath);
+        LocalDateTime parentLastUpdate = Instant.ofEpochMilli(parent.lastModified())
+                .atZone(ZoneId.systemDefault()).toLocalDateTime();
 
-        for (ConcurrentHashMap<String, FileData> innerMap : filesRepos.values()) {
-            count += innerMap.size();
+        ConcurrentHashMap<String, FileData> parentMap = filesRepos.getOrDefault(parentPath, null);
+        if (parentMap == null) return;
+
+        HashSet<String> childrenSet = new HashSet<>();
+        for (File file : children) {
+            childrenSet.add(file.getName());
+            if (file.isDirectory()) hasFolderChildren = true;
         }
 
-        return count;
+        parentFileData.setActualizationInfo(new ActualizationInfo(parentPath, parentLastUpdate, hasFolderChildren));
+
+        for (String name : parentMap.keySet()) {
+            if (!childrenSet.contains(name)) {
+                parentMap.remove(name);
+                String path = parentPath + "/" + name;
+                removeDirRecursive(path, filesRepos.getOrDefault(path, null));
+            }
+        }
     }
 
-    public List<FileData> getCachedFiles() {
+    public Statistic getStatistic(boolean refreshNow) {
+        if (refreshNow) refreshStatistic();
+        return statistic;
+    }
+
+    public void storeFilesData() {
+        storeFilesInfoCache();
+        storeFoldersActualizationInfo();
+    }
+
+    public void restoreFilesData() {
+        restoreFilesInfoCache();
+        restoreFoldersActualizationInfo();
+    }
+
+    public void clearFilesInfoCache() {
+        forEachFile(file -> {
+            file.setFileInfoCache(null);
+            return false;
+        });
+
+        deleteTxt(ManagerOfDatabase.CACHE_FILES_INFO_TXT);
+        statistic.setSavedCachedFilesCount(0);
+    }
+
+    public void clearActualizationInfo() {
+        forEachFile(file -> {
+            file.setActualizationInfo(null);
+            return false;
+        });
+
+        deleteTxt(ManagerOfDatabase.FOLDERS_ACTUALIZATION_INFO_TXT);
+        statistic.setSavedActualizationInfoCount(0);
+    }
+
+    private void storeFilesInfoCache() {
+        List<FileData> cachedFiles = getCachedFiles();
+        String[] filesInfoStr = new String[cachedFiles.size()];
+
+        for (int i = 0; i < cachedFiles.size(); i++) {
+            FileData data = cachedFiles.get(i);
+            ModelMediaFile cache = data.getFileInfoCache();
+            filesInfoStr[i] = cache != null ? cache.toJson() : "null";
+        }
+
+        TxtFile cacheTxt = saveTxt(ManagerOfDatabase.CACHE_FILES_INFO_TXT, filesInfoStr);
+        statistic.setSavedCachedFilesCount(cacheTxt.strings.length);
+    }
+
+    private void restoreFilesInfoCache() {
+        TxtFile cacheTxt = readTxt(ManagerOfDatabase.CACHE_FILES_INFO_TXT);
+
+        if (cacheTxt != null && cacheTxt.strings != null && cacheTxt.strings.length > 0) {
+            statistic.setSavedCachedFilesCount(cacheTxt.strings.length);
+
+            for (int i = 0; i < cacheTxt.strings.length; i++) {
+                String json = cacheTxt.strings[i];
+                if (!Objects.equals(json, "null")) {
+                    ModelMediaFile fileInfo = new ModelMediaFile(json);
+                    FileData data = getOrCreateFile(fileInfo.path);
+                    data.setFileInfoCache(fileInfo);
+                }
+            }
+        } else {
+            statistic.setSavedCachedFilesCount(0);
+        }
+    }
+
+    private void storeFoldersActualizationInfo() {
+        List<FileData> cachedFiles = getFoldersWithActualizationInfo();
+        String[] infoStr = new String[cachedFiles.size()];
+
+        for (int i = 0; i < cachedFiles.size(); i++) {
+            FileData data = cachedFiles.get(i);
+            ActualizationInfo cache = data.getActualizationInfo();
+            infoStr[i] = cache != null ? cache.toJson() : "null";
+        }
+
+        TxtFile cacheTxt = saveTxt(ManagerOfDatabase.FOLDERS_ACTUALIZATION_INFO_TXT, infoStr);
+        statistic.setSavedActualizationInfoCount(cacheTxt.strings.length);
+    }
+
+    private void restoreFoldersActualizationInfo() {
+        TxtFile cacheTxt = readTxt(ManagerOfDatabase.FOLDERS_ACTUALIZATION_INFO_TXT);
+
+        if (cacheTxt != null && cacheTxt.strings != null && cacheTxt.strings.length > 0) {
+            statistic.setSavedActualizationInfoCount(cacheTxt.strings.length);
+
+            for (int i = 0; i < cacheTxt.strings.length; i++) {
+                String json = cacheTxt.strings[i];
+                if (!Objects.equals(json, "null")) {
+                    ActualizationInfo actualizationInfo = new ActualizationInfo(json);
+                    FileData data = getOrCreateFile(actualizationInfo.path);
+                    data.setActualizationInfo(actualizationInfo);
+                }
+            }
+        } else {
+            statistic.setSavedActualizationInfoCount(0);
+        }
+    }
+
+    private void refreshStatistic() {
+        int filesCount = 0;
+        int cachedFilesCount = 0;
+        int actualizationInfoCount = 0;
+
+        for (ConcurrentHashMap<String, FileData> innerMap : filesRepos.values()) {
+            for (FileData data : innerMap.values()) {
+                filesCount++;
+                if (data.getFileInfoCache() != null) cachedFilesCount++;
+                if (data.getActualizationInfo() != null) actualizationInfoCount++;
+            }
+        }
+
+        statistic.setFilesCount(filesCount);
+        statistic.setCachedFilesCount(cachedFilesCount);
+        statistic.setActualizationInfoCount(actualizationInfoCount);
+    }
+
+    private List<FileData> getCachedFiles() {
         List<FileData> cachedFiles = new ArrayList<>();
 
         for (ConcurrentHashMap<String, FileData> innerMap : filesRepos.values()) {
@@ -108,63 +248,18 @@ public class ManagerOfDatabase {
         return cachedFiles;
     }
 
-    public TxtFile getCacheTxt() {
-        return cacheTxt;
-    }
+    private List<FileData> getFoldersWithActualizationInfo() {
+        List<FileData> cachedFiles = new ArrayList<>();
 
-    public void storeFilesInfoCache() {
-        List<FileData> cachedFiles = getCachedFiles();
-        String[] filesInfoStr = new String[cachedFiles.size()];
-
-        for (int i = 0; i < cachedFiles.size(); i++) {
-            FileData data = cachedFiles.get(i);
-            ModelMediaFile cache = data.getFileInfoCache();
-            filesInfoStr[i] = cache != null ? cache.toJson() : "null";
-        }
-
-        cacheTxt = saveTxt(ManagerOfDatabase.CACHE_FILES_INFO_TXT, filesInfoStr);
-    }
-
-    public void restoreFilesInfoCache() {
-        cacheTxt = readTxt(ManagerOfDatabase.CACHE_FILES_INFO_TXT);
-
-        if (cacheTxt != null && cacheTxt.strings != null && cacheTxt.strings.length > 0) {
-            for (int i = 0; i < cacheTxt.strings.length; i++) {
-                String json = cacheTxt.strings[i];
-                if (!Objects.equals(json, "null")) {
-                    ModelMediaFile fileInfo = new ModelMediaFile(json);
-                    FileData data = getOrCreateFile(fileInfo.path);
-                    data.setFileInfoCache(fileInfo);
+        for (ConcurrentHashMap<String, FileData> innerMap : filesRepos.values()) {
+            for (FileData data : innerMap.values()) {
+                if (data.getActualizationInfo() != null) {
+                    cachedFiles.add(data);
                 }
             }
         }
-    }
 
-    public void actualizeFiles(File parent, File[] children) {
-        String parentPath = parent.getAbsolutePath();
-        boolean hasFolderChildren = false;
-        FileData fileData = getOrCreateFile(parentPath);
-        LocalDateTime parentLastUpdate = Instant.ofEpochMilli(parent.lastModified())
-                .atZone(ZoneId.systemDefault()).toLocalDateTime();
-
-        ConcurrentHashMap<String, FileData> parentMap = filesRepos.getOrDefault(parentPath, null);
-        if (parentMap == null) return;
-
-        HashSet<String> childrenSet = new HashSet<>();
-        for (File file : children) {
-            childrenSet.add(file.getName());
-            if (file.isDirectory()) hasFolderChildren = true;
-        }
-
-        fileData.setActualizationInfo(new ActualizationInfo(parentLastUpdate, hasFolderChildren));
-
-        for (String name : parentMap.keySet()) {
-            if (!childrenSet.contains(name)) {
-                parentMap.remove(name);
-                String path = parentPath + "/" + name;
-                removeDirRecursive(path, filesRepos.getOrDefault(path, null));
-            }
-        }
+        return cachedFiles;
     }
 
     private void removeDirRecursive(String path, ConcurrentHashMap<String, FileData> children) {
@@ -234,6 +329,12 @@ public class ManagerOfDatabase {
         );
     }
 
+    private boolean deleteTxt(String filePath) {
+        Object[] dirAndName = parseDirAndFileNameFromFilePath(filePath);
+        File file = new File((File) dirAndName[0], (String) dirAndName[1]);
+        return file.delete();
+    }
+
     private Object[] parseDirAndFileNameFromFilePath(String filePath) {
         String[] dirAndName = filePath.split("/");
         String dir = dirAndName[0];
@@ -251,7 +352,7 @@ public class ManagerOfDatabase {
         public final LocalDateTime updatedAt;
         public final String[] strings;
 
-        public TxtFile(
+        private TxtFile(
                 String filePath,
                 LocalDateTime updatedAt,
                 String[] strings
@@ -272,7 +373,7 @@ public class ManagerOfDatabase {
         @Nullable
         private ActualizationInfo actualizationInfo;
 
-        public FileData(String parentPath, String name) {
+        private FileData(String parentPath, String name) {
             this.parentPath = parentPath;
             this.name = name;
             this.path = parentPath + "/" + name;
@@ -298,12 +399,64 @@ public class ManagerOfDatabase {
     }
 
     public static class ActualizationInfo {
+        public final String path;
         public final LocalDateTime updatedAt;
         public final boolean hasFolderChildren;
 
-        public ActualizationInfo(LocalDateTime updatedAt, boolean hasFolderChildren) {
+        private ActualizationInfo(
+                String path,
+                LocalDateTime updatedAt,
+                boolean hasFolderChildren
+        ) {
+            this.path = path;
             this.updatedAt = updatedAt;
             this.hasFolderChildren = hasFolderChildren;
         }
+
+        private ActualizationInfo(String jsonStr) {
+            JSONObject json = JsonUtil.newJsonObject(jsonStr);
+            this.path = JsonUtil.getString(json, "path", null);
+            this.updatedAt = JsonUtil.getLocalDateTime(json, "updatedAt", null);
+            this.hasFolderChildren = JsonUtil.getBoolean(json, "hasFolderChildren", null);
+        }
+
+        public String toJson() {
+            JSONObject json = JsonUtil.newJsonObject();
+            JsonUtil.addString(json, "path", path);
+            JsonUtil.addLocalDateTime(json, "updatedAt", updatedAt);
+            JsonUtil.addBoolean(json, "hasFolderChildren", hasFolderChildren);
+            return json.toString();
+        }
+    }
+
+    public static class Statistic {
+        private int filesCount;
+        private int cachedFilesCount;
+        private int savedCachedFilesCount;
+        private int actualizationInfoCount;
+        private int savedActualizationInfoCount;
+
+        private Statistic() {
+            this.filesCount = 0;
+            this.cachedFilesCount = 0;
+            this.savedCachedFilesCount = 0;
+            this.actualizationInfoCount = 0;
+            this.savedActualizationInfoCount = 0;
+        }
+
+        public int getFilesCount() { return filesCount; }
+        private void setFilesCount(int value) { filesCount = value; }
+
+        public int getCachedFilesCount() { return cachedFilesCount; };
+        private void setCachedFilesCount(int value) { cachedFilesCount = value; }
+
+        public int getSavedCachedFilesCount() { return savedCachedFilesCount; };
+        private void setSavedCachedFilesCount(int value) { savedCachedFilesCount = value; }
+
+        public int getActualizationInfoCount() { return actualizationInfoCount; }
+        private void setActualizationInfoCount(int value) { actualizationInfoCount = value; }
+
+        public int getSavedActualizationInfoCount() { return savedActualizationInfoCount; }
+        private void setSavedActualizationInfoCount(int value) { savedActualizationInfoCount = value; }
     }
 }

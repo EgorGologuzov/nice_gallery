@@ -23,14 +23,33 @@
             android:ellipsize="end"/>
 
         <com.nti.nice_gallery.views.buttons.ButtonBase
-            android:id="@+id/buttonFilesCacheDetails"
+            android:id="@+id/buttonFilesCacheClear"
             style="@style/Custom_ActionBar_Button"
-            android:src="@drawable/baseline_question_mark_24"
-            android:layout_marginEnd="4dp"
-            android:layout_marginStart="8dp" />
+            android:src="@drawable/baseline_delete_forever_24"
+            android:layout_marginEnd="8dp"
+            android:layout_marginStart="4dp"/>
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center">
+
+        <TextView
+            android:id="@+id/textActualizationCacheInfo"
+            style="@style/TextAppearance.AppCompat.Body1"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:text="[Actualization cache info]"
+            android:layout_weight="1"
+            android:layout_marginStart="16dp"
+            android:maxLines="2"
+            android:ellipsize="end" />
 
         <com.nti.nice_gallery.views.buttons.ButtonBase
-            android:id="@+id/buttonFilesCacheClear"
+            android:id="@+id/buttonActualizationCacheClear"
             style="@style/Custom_ActionBar_Button"
             android:src="@drawable/baseline_delete_forever_24"
             android:layout_marginEnd="8dp"

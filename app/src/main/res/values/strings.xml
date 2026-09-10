@@ -14,9 +14,14 @@
     <string name="format_size_2d">%dx%d</string>
     <!--Date-->
     <string name="format_java_simple_date_full_numeric">dd.MM.yyyy</string>
-    <!--Duration-->
+    <string name="format_java_simple_date_time">dd.MM.yyyy HH:mm</string>
+    <string name="format_java_simple_date_time_with_seconds">dd.MM.yyyy HH:mm:ss</string>
+    <!--Time-->
     <string name="format_duration_short">%d:%02d</string>
     <string name="format_duration_full">%d:%02d:%02d</string>
+    <string name="format_interval_duration">%d.%03d сек.</string>
+    <string name="format_interval_duration_with_minutes">%d:%02d.%03d</string>
+    <string name="format_interval_duration_with_hours">%d:%02d:%02d.%03d</string>
     <!--Elements count-->
     <string name="format_elements_count">%d элемент(а/ов)</string>
     <!--Storage-->
@@ -32,6 +37,7 @@
     <string name="format_rewind_time_back">-%d</string>
     <!--Info-->
     <string name="format_info_files_cache">Кеш. файлов %s (сохранено %s)</string>
+    <string name="format_info_actualization_cache">Кеш. папок %s (сохранено %s)</string>
     <string name="format_info_previews_cache">Кеш. превью %s (ОЗУ ~ %s)</string>
     <string name="format_info_file_txt">Кол-во строк: %d\nИзменен: %s</string>
     <!--Messages-->
@@ -50,6 +56,15 @@
     <string name="format_message_file_type_file">[Файл] %s;</string>
     <string name="format_message_file_type_other">[] %s;</string>
     <string name="format_message_item_deletion_request">Удалить элемент: %s</string>
+    <string name="format_message_database_restored">Данные файлов загружены за %s</string>
+    <string name="format_message_scanning_duration">Длилось %s (начато %s)</string>
+    <string name="format_message_scanning_error">При сканировании произошла ошибка: %s</string>
+    <string name="format_message_scanning_found_storages">Найдено хранилищ (%d)</string>
+    <string name="format_message_scanning_found_folders">Найдено папок (%d)</string>
+    <string name="format_message_scanning_found_files">Найдено файлов (%d)</string>
+    <string name="format_message_scanning_files_with_errors">Файлов с ошибками (%d)</string>
+    <string name="format_message_scanning_scan_path">Сканируемый путь: %s</string>
+    <string name="format_message_scanning_file_error_info">- %s, %s</string>
     <string name="format_status_info_action_progress">Обработка: %s (%d/%d)</string>
     <string name="format_status_info_response_report">Найдено файлов: %d</string>
     <string name="format_background_operation_status">Фоновая операция (еще %d в очереди)</string>
@@ -118,9 +133,15 @@
     <string name="notif_title_prepare">Подготовка…</string>
     <string name="notif_title_background_operation">Фоновая операция</string>
     <string name="notif_button_cancel">Отмена</string>
+    <string name="notif_message_store_file_data">Сохранение данных о файлах</string>
+    <string name="notif_message_store_file_data_finished">Данные о файлах сохранены</string>
 
 <!--Titles-->
     <string name="title_history_paths">Последние:</string>
+
+<!--Prefixes-->
+    <string name="prefix_ok">[ OK ]</string>
+    <string name="prefix_error">[ ERR ]</string>
 
 <!--Settings titles-->
     <string name="settings_title_scan_params">Параметры сканирования</string>

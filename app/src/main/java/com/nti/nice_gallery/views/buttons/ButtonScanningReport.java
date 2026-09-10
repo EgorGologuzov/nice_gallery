@@ -46,67 +46,6 @@ public class ButtonScanningReport extends ButtonBase {
     }
 
     private void onClick() {
-        Supplier<String> generateReport = () -> {
-            if (source == null) {
-                return getContext().getString(R.string.message_scanning_report_source_not_set);
-            }
-
-            StringBuilder builder = new StringBuilder();
-            Function1<String, Integer> addLine = line -> { builder.append(line); builder.append("\n"); return 0; };
-
-            addLine.invoke("Длилось: " + ChronoUnit.MILLIS.between(source.scanningStartedAt, source.scanningFinishedAt) / 1000f + " сек. (начато: " + source.scanningStartedAt + ")");
-            addLine.invoke("");
-
-            if (source.error != null) {
-                addLine.invoke("При сканировании произошла ошибка: " + source.error.getMessage());
-                return builder.toString();
-            }
-
-            if (source.scannedStorages != null && !source.scannedStorages.isEmpty()) {
-                addLine.invoke("Найдено хранилищ (" + source.scannedStorages.size() + "):");
-                addLine.invoke("");
-
-                for (ModelStorage storage : source.scannedStorages) {
-                    addLine.invoke((storage.error == null ? "[ OK ]" : "[ ERR ]") + " " + storage.description + " " + storage.name);
-                }
-
-                addLine.invoke("");
-            }
-
-            if (source.path != null) {
-                addLine.invoke("Сканируемый путь: " + source.path);
-                addLine.invoke("");
-            }
-
-            int countFolders = 0, countFiles = 0;
-
-            for (ModelMediaFile file : source.files) {
-                if (file.type == ModelMediaFile.Type.Folder) {
-                    countFolders++;
-                } else {
-                    countFiles++;
-                }
-            }
-
-            addLine.invoke("Найдено папок (" + countFolders + ")");
-            addLine.invoke("");
-
-            addLine.invoke("Найдено файлов (" + countFiles + ")");
-            addLine.invoke("");
-
-            addLine.invoke("Файлов с ошибками (" + source.filesWithErrors.size() + "):");
-            addLine.invoke("");
-
-            for (ModelMediaFile file : source.filesWithErrors) {
-                addLine.invoke("- " + file.name + ", " + file.error.getMessage().substring(0, 50));
-            }
-
-            return builder.toString();
-        };
-
-        managerOfDialogs.showInfo(
-                R.string.dialog_title_scanning_report,
-                generateReport.get()
-        );
+        managerOfDialogs.showScanningReport(source);
     }
 }

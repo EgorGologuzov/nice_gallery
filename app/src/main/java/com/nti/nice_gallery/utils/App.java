@@ -5,14 +5,21 @@ import android.app.Activity;
 import android.app.Application;
 import android.os.Bundle;
 
+import com.nti.nice_gallery.R;
 import com.nti.nice_gallery.data.ManagerOfDatabase;
+import com.nti.nice_gallery.models.ModelProgress;
+
+import java.time.LocalDateTime;
 
 public class App extends Application implements Application.ActivityLifecycleCallbacks {
 
     private int startedActivities = 0;
 
+    private Convert convert;
     private ManagerOfDatabase managerOfDatabase;
     private ManagerOfThreads managerOfThreads;
+    private ManagerOfNotifications managerOfNotifications;
+    private ManagerOfBackground managerOfBackground;
 
     @Override
     public void onCreate() {
@@ -23,13 +30,28 @@ public class App extends Application implements Application.ActivityLifecycleCal
     }
 
     private void init() {
+        ManagerOfNotifications.appStartInit(this);
+
+        convert = new Convert(this);
         managerOfDatabase = new ManagerOfDatabase(this);
         managerOfThreads = new ManagerOfThreads(this);
-        ManagerOfNotifications.appStartInit(this);
+        managerOfNotifications = new ManagerOfNotifications(this);
+        managerOfBackground = new ManagerOfBackground(this);
     }
 
     private void onAppStart() {
-        managerOfThreads.executeAsync(() -> managerOfDatabase.restoreFilesInfoCache());
+        final String pattern = getString(R.string.format_message_database_restored);
+
+        Runnable restoreDatabase = () -> {
+            final LocalDateTime start = LocalDateTime.now();
+            managerOfDatabase.restoreFilesData();
+            String timeStr = convert.timeIntervalToTimeString(start, LocalDateTime.now());
+            new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
+                managerOfNotifications.showToast(String.format(pattern, timeStr));
+            });
+        };
+
+        managerOfThreads.executeAsync(restoreDatabase);
     }
 
     private void onAppEnterForeground() {
@@ -37,7 +59,24 @@ public class App extends Application implements Application.ActivityLifecycleCal
     }
 
     private void onAppEnterBackground() {
-        managerOfDatabase.storeFilesInfoCache();
+        final String progressMessage = getString(R.string.notif_message_store_file_data);
+        final String finishMessage = getString(R.string.notif_message_store_file_data_finished);
+
+        Runnable storeFilesData = () -> {
+            managerOfBackground.startTask(new ManagerOfBackground.BackgroundTask() {
+                @Override
+                public void start() {
+                    ModelProgress progress = new ModelProgress(0, 1, progressMessage);
+                    notifyProgress(progress);
+                    managerOfDatabase.storeFilesData();
+                    progress = new ModelProgress(1, 1, progressMessage);
+                    notifyProgress(progress);
+                    notifyFinished(finishMessage);
+                }
+            });
+        };
+
+        storeFilesData.run();
     }
 
     @Override

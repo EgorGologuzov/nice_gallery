@@ -10,6 +10,7 @@ import com.nti.nice_gallery.R;
 import java.text.SimpleDateFormat;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.Date;
 
 public class Convert {
@@ -66,6 +67,13 @@ public class Convert {
         return date.format(formatter);
     }
 
+    public String dateToDateTimeString(LocalDateTime date, boolean includeSeconds) {
+        if (date == null) return null;
+        String pattern = includeSeconds ? context.getString(R.string.format_java_simple_date_time_with_seconds) : context.getString(R.string.format_java_simple_date_time);
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern(pattern);
+        return date.format(formatter);
+    }
+
     public String durationToTimeString(Integer duration) {
         if (duration == null) {
             return null;
@@ -87,6 +95,31 @@ public class Convert {
         return String.format(context.getResources().getString(R.string.format_duration_full), hours, minutes, seconds);
     }
 
+    public String timeIntervalToTimeString(LocalDateTime begin, LocalDateTime end) {
+        if (begin == null || end == null) {
+            return null;
+        }
+
+        long div = ChronoUnit.MILLIS.between(begin, end);
+        long millis = div % 1000;
+        div /= 1000;
+        long seconds = div % 60;
+        div /= 60;
+        long minutes = div % 60;
+        div /= 60;
+        long hours = div;
+
+        if (hours == 0) {
+            if (minutes == 0) {
+                return String.format(context.getResources().getString(R.string.format_interval_duration), seconds, millis);
+            } else {
+                return String.format(context.getResources().getString(R.string.format_interval_duration_with_minutes), minutes, seconds, millis);
+            }
+        } else {
+            return String.format(context.getResources().getString(R.string.format_interval_duration_with_hours), hours, minutes, seconds, millis);
+        }
+    }
+
     public <T extends Enum<T>> T indexToEnumValue(Class<T> enumClass, int index) {
         T[] constants = enumClass.getEnumConstants();
 
@@ -100,5 +133,5 @@ public class Convert {
     public <T extends Enum<T>> String enumValueToStringArrayValue(T value, @ArrayRes int stringArr) {
         String[] strings = context.getResources().getStringArray(stringArr);
         return strings[value.ordinal()];
-    };
+    }
 }

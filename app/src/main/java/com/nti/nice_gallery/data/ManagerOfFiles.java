@@ -868,7 +868,7 @@ public class ManagerOfFiles implements IManagerOfFiles {
             return;
         }
 
-        List<ModelMediaFile> cachedList = managerOfCache.getFolderFiles(folder);
+        List<ModelMediaFile> cachedList = managerOfCache.getFolderFiles(folder, false);
         if (cachedList != null) {
             managerOfThreads.safeAccept(callback, cachedList);
             return;
@@ -942,9 +942,9 @@ public class ManagerOfFiles implements IManagerOfFiles {
                     case PATH_IS_TARGET_PARENT: folderFiles = getFolderFilesAndActualize.invoke(true); break;
                     case PATH_IS_TARGET:
                     case PATH_IS_TARGET_CHILD:
-                        List<ModelMediaFile> cachedList = managerOfCache.getFolderFiles(folder);
+                        List<ModelMediaFile> cachedList = managerOfCache.getFolderFiles(folder, true);
                         if (cachedList != null) {
-                            filesInfoCached.addAll(cachedList.stream().filter(f -> f.isFile).collect(Collectors.toList()));
+                            filesInfoCached.addAll(cachedList);
                             return;
                         }
                         folderFiles = getFolderFilesAndActualize.invoke(false);
@@ -954,9 +954,9 @@ public class ManagerOfFiles implements IManagerOfFiles {
                 switch (pathStatus) {
                     case PATH_IS_NOT_TARGET:
                     case PATH_IS_TARGET_PARENT:
-                        List<ModelMediaFile> cachedList = managerOfCache.getFolderFiles(folder);
+                        List<ModelMediaFile> cachedList = managerOfCache.getFolderFiles(folder, true);
                         if (cachedList != null) {
-                            filesInfoCached.addAll(cachedList.stream().filter(f -> f.isFile).collect(Collectors.toList()));
+                            filesInfoCached.addAll(cachedList);
                             return;
                         }
                         folderFiles = getFolderFilesAndActualize.invoke(false);
